@@ -1,0 +1,67 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<section class="max-w-5xl mx-auto px-4 py-16 space-y-10">
+	<header class="text-center space-y-4">
+		<p class="text-sm uppercase tracking-[0.3em] text-emerald-300">About</p>
+		<h1 class="text-4xl sm:text-5xl font-extrabold text-white">Built for repeatable client launches</h1>
+		<p class="text-lg text-gray-300 max-w-3xl mx-auto">
+			Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus lacinia odio vitae vestibulum vestibulum. Cras venenatis euismod malesuada, sed semper ipsum feugiat ac.
+		</p>
+	</header>
+
+	<div class="grid md:grid-cols-3 gap-6">
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
+			<h3 class="text-xl font-bold text-emerald-300 mb-2">Principled by design</h3>
+			<p class="text-gray-300">Curabitur arcu erat, accumsan id imperdiet et, porttitor at sem. Mauris blandit aliquet elit, eget tincidunt nibh pulvinar.</p>
+		</article>
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
+			<h3 class="text-xl font-bold text-cyan-200 mb-2">Secure isolation</h3>
+			<p class="text-gray-300">Donec sollicitudin molestie malesuada. Nulla quis lorem ut libero malesuada feugiat. Donec rutrum congue leo eget malesuada.</p>
+		</article>
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
+			<h3 class="text-xl font-bold text-yellow-200 mb-2">Fast iteration</h3>
+			<p class="text-gray-300">Praesent sapien massa, convallis a pellentesque nec, egestas non nisi. Nulla porttitor accumsan tincidunt.</p>
+		</article>
+	</div>
+
+	<div class="grid md:grid-cols-2 gap-8 items-center">
+		<div class="space-y-4">
+			<h2 class="text-3xl font-bold text-white">Why WebWise</h2>
+			<p class="text-gray-300">Sed porttitor lectus nibh. Vivamus suscipit tortor eget felis porttitor volutpat. Pellentesque in ipsum id orci porta dapibus.</p>
+			<ul class="space-y-2 text-gray-300">
+				<li class="flex items-start gap-3"><span class="text-emerald-300">•</span> Container-per-client isolation for predictable deploys.</li>
+				<li class="flex items-start gap-3"><span class="text-emerald-300">•</span> Independent databases to keep boundaries clear.</li>
+				<li class="flex items-start gap-3"><span class="text-emerald-300">•</span> Templates that cut setup time without sacrificing quality.</li>
+			</ul>
+		</div>
+		<div class="bg-gray-900/50 border border-gray-800 rounded-2xl p-6 shadow-lg space-y-4">
+			<h3 class="text-lg font-semibold text-emerald-200">Timeline snapshot</h3>
+			<div class="grid grid-cols-2 gap-4">
+				<div class="bg-gray-800/60 rounded-xl p-4 text-center">
+					<div class="text-3xl font-extrabold text-white">48h</div>
+					<p class="text-sm text-gray-400">Prototype container</p>
+				</div>
+				<div class="bg-gray-800/60 rounded-xl p-4 text-center">
+					<div class="text-3xl font-extrabold text-white">1</div>
+					<p class="text-sm text-gray-400">Command deploy target</p>
+				</div>
+				<div class="bg-gray-800/60 rounded-xl p-4 text-center">
+					<div class="text-3xl font-extrabold text-white">0</div>
+					<p class="text-sm text-gray-400">Shared client DBs</p>
+				</div>
+				<div class="bg-gray-800/60 rounded-xl p-4 text-center">
+					<div class="text-3xl font-extrabold text-white">24/7</div>
+					<p class="text-sm text-gray-400">Uptime target</p>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="bg-gradient-to-r from-emerald-500/20 to-cyan-500/10 border border-emerald-700/40 rounded-2xl p-8 text-center space-y-3">
+		<h3 class="text-2xl font-bold text-white">Ready for the next client build</h3>
+		<p class="text-gray-200">Maecenas faucibus mollis interdum. Fusce dapibus, tellus ac cursus commodo.</p>
+		<a href="/contact" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-3 rounded-xl transition">Start a project</a>
+	</div>
+</section>
+{% endblock %}

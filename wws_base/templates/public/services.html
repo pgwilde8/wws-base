@@ -1,0 +1,79 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<section class="max-w-6xl mx-auto px-4 py-16 space-y-12">
+	<header class="text-center space-y-3">
+		<p class="text-sm uppercase tracking-[0.3em] text-cyan-200">Services</p>
+		<h1 class="text-4xl sm:text-5xl font-extrabold text-white">What we ship for clients</h1>
+		<p class="text-lg text-gray-300 max-w-3xl mx-auto">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec id elit non mi porta gravida at eget metus.</p>
+	</header>
+
+	<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
+			<h3 class="text-xl font-bold text-emerald-300 mb-2">FastAPI builds</h3>
+			<p class="text-gray-300">Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Integer posuere erat a ante venenatis dapibus posuere velit aliquet.</p>
+			<ul class="mt-4 space-y-2 text-sm text-gray-300">
+				<li class="flex gap-2"><span class="text-emerald-400">•</span> Auth flows and dashboards</li>
+				<li class="flex gap-2"><span class="text-emerald-400">•</span> API-first architecture</li>
+				<li class="flex gap-2"><span class="text-emerald-400">•</span> Observability baked in</li>
+			</ul>
+		</article>
+
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
+			<h3 class="text-xl font-bold text-cyan-200 mb-2">AI integrations</h3>
+			<p class="text-gray-300">Aenean lacinia bibendum nulla sed consectetur. Sed posuere consectetur est at lobortis. Curabitur blandit tempus porttitor.</p>
+			<ul class="mt-4 space-y-2 text-sm text-gray-300">
+				<li class="flex gap-2"><span class="text-cyan-300">•</span> Chat and summarization flows</li>
+				<li class="flex gap-2"><span class="text-cyan-300">•</span> Retrieval and data guards</li>
+				<li class="flex gap-2"><span class="text-cyan-300">•</span> BYOK across providers</li>
+			</ul>
+		</article>
+
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
+			<h3 class="text-xl font-bold text-yellow-200 mb-2">Automations</h3>
+			<p class="text-gray-300">Etiam porta sem malesuada magna mollis euismod. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor.</p>
+			<ul class="mt-4 space-y-2 text-sm text-gray-300">
+				<li class="flex gap-2"><span class="text-yellow-200">•</span> Webhooks and jobs</li>
+				<li class="flex gap-2"><span class="text-yellow-200">•</span> Scheduling and retries</li>
+				<li class="flex gap-2"><span class="text-yellow-200">•</span> Monitoring hooks</li>
+			</ul>
+		</article>
+
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
+			<h3 class="text-xl font-bold text-pink-200 mb-2">Data & storage</h3>
+			<p class="text-gray-300">Nullam id dolor id nibh ultricies vehicula ut id elit. Maecenas faucibus mollis interdum.</p>
+			<ul class="mt-4 space-y-2 text-sm text-gray-300">
+				<li class="flex gap-2"><span class="text-pink-200">•</span> Postgres per tenant</li>
+				<li class="flex gap-2"><span class="text-pink-200">•</span> Migrations ready</li>
+				<li class="flex gap-2"><span class="text-pink-200">•</span> Object storage hooks</li>
+			</ul>
+		</article>
+
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
+			<h3 class="text-xl font-bold text-indigo-200 mb-2">Deployment</h3>
+			<p class="text-gray-300">Cras mattis consectetur purus sit amet fermentum. Aenean eu leo quam. Pellentesque ornare sem lacinia quam venenatis vestibulum.</p>
+			<ul class="mt-4 space-y-2 text-sm text-gray-300">
+				<li class="flex gap-2"><span class="text-indigo-200">•</span> Dockerized per client</li>
+				<li class="flex gap-2"><span class="text-indigo-200">•</span> UFW and Fail2Ban aware</li>
+				<li class="flex gap-2"><span class="text-indigo-200">•</span> External port mapping</li>
+			</ul>
+		</article>
+
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
+			<h3 class="text-xl font-bold text-orange-200 mb-2">Support</h3>
+			<p class="text-gray-300">Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Integer posuere erat a ante venenatis dapibus posuere velit aliquet.</p>
+			<ul class="mt-4 space-y-2 text-sm text-gray-300">
+				<li class="flex gap-2"><span class="text-orange-200">•</span> Playbooks and runbooks</li>
+				<li class="flex gap-2"><span class="text-orange-200">•</span> Logging and alerts</li>
+				<li class="flex gap-2"><span class="text-orange-200">•</span> Handoff documentation</li>
+			</ul>
+		</article>
+	</div>
+
+	<div class="bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 border border-cyan-700/40 rounded-2xl p-8 text-center space-y-3">
+		<h3 class="text-2xl font-bold text-white">Need something custom?</h3>
+		<p class="text-gray-200">Vestibulum id ligula porta felis euismod semper. Nulla vitae elit libero, a pharetra augue.</p>
+		<a href="/contact" class="inline-block bg-cyan-500 hover:bg-cyan-600 text-white font-semibold px-6 py-3 rounded-xl transition">Talk to us</a>
+	</div>
+</section>
+{% endblock %}

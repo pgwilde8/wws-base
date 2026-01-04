@@ -1,0 +1,31 @@
+{% extends "layout/base.html" %}
+{% block title %}Admin Login{% endblock %}
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 py-12">
+  <div class="w-full max-w-md bg-gray-900/70 border border-white/10 rounded-2xl p-8 shadow-xl space-y-6">
+    <div class="text-center space-y-2">
+      <p class="text-sm uppercase tracking-[0.25em] text-teal-300">Admins</p>
+      <h1 class="text-3xl font-extrabold text-white">Sign in</h1>
+      <p class="text-sm text-gray-300">Access the control dashboard.</p>
+    </div>
+
+    <form method="POST" action="/auth/admin" class="space-y-4">
+      <div class="space-y-1">
+        <label class="block text-sm text-gray-300" for="username">Username</label>
+        <input id="username" name="username" placeholder="admin" required
+          class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-teal-500"/>
+      </div>
+
+      <div class="space-y-1">
+        <label class="block text-sm text-gray-300" for="password">Password</label>
+        <input id="password" type="password" name="password" placeholder="••••••••" required
+          class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-teal-500"/>
+      </div>
+
+      <button type="submit" class="w-full py-3 rounded-xl font-bold bg-gradient-to-r from-teal-500 to-emerald-500 hover:opacity-95 transition">
+        Login →
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

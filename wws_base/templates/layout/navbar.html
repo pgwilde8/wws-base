@@ -1,0 +1,81 @@
+<nav class="bg-black/90 border-b border-white/10 px-4 py-3">
+  <div class="flex justify-between items-center max-w-6xl mx-auto">
+
+    <!-- Logo / Brand -->
+    <a href="/" class="text-xl font-extrabold text-teal-400">WebWise</a>
+
+    <!-- Desktop menu -->
+    <div class="hidden md:flex gap-6 text-sm font-semibold text-neutral-300 items-center">
+      <a href="/about" class="hover:text-white transition">About</a>
+      <a href="/services" class="hover:text-white transition">Services</a>
+      <a href="/testimonials" class="hover:text-white transition">Testimonials</a>
+      <a href="/faq" class="hover:text-white transition">FAQ</a>
+      <a href="/contact" class="hover:text-white transition">Contact</a>
+
+      <div class="relative" id="loginMenu">
+        <button id="loginMenuBtn" class="hover:text-teal-400 transition flex items-center gap-1">
+          Login
+          <span aria-hidden="true">▾</span>
+        </button>
+        <div id="loginDropdown" class="hidden absolute right-0 mt-2 w-36 rounded-md bg-neutral-900 border border-white/10 shadow-lg py-2">
+          <a href="/login/admin" class="block px-4 py-2 text-sm hover:bg-white/5">Admin</a>
+          <a href="/login/client" class="block px-4 py-2 text-sm hover:bg-white/5">Client</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile hamburger -->
+    <button id="hamburgerBtn" class="md:hidden text-white text-2xl">☰</button>
+  </div>
+
+  <!-- Mobile slide-down menu -->
+  <div id="mobileMenu" class="hidden md:hidden mt-3 flex flex-col gap-3 text-sm font-medium text-neutral-200">
+    <a href="/about" class="hover:text-teal-300">About</a>
+    <a href="/services" class="hover:text-teal-300">Services</a>
+    <a href="/testimonials" class="hover:text-teal-300">Testimonials</a>
+    <a href="/faq" class="hover:text-teal-300">FAQ</a>
+    <a href="/contact" class="hover:text-teal-300">Contact</a>
+
+    <!-- Login choices toggle -->
+    <button id="mobileLoginBtn" class="mt-2 text-left font-bold text-teal-400 hover:opacity-80 flex items-center gap-1">
+      Login
+      <span aria-hidden="true">▾</span>
+    </button>
+    <div id="mobileLoginLinks" class="hidden flex flex-col gap-2 pl-2">
+      <a href="/login/admin" class="text-teal-200 hover:text-white">Admin</a>
+      <a href="/login/client" class="text-teal-200 hover:text-white">Client</a>
+    </div>
+  </div>
+
+  <script>
+    const btn = document.getElementById("hamburgerBtn");
+    const menu = document.getElementById("mobileMenu");
+    const loginBtn = document.getElementById("loginMenuBtn");
+    const loginDropdown = document.getElementById("loginDropdown");
+    const mobileLoginBtn = document.getElementById("mobileLoginBtn");
+    const mobileLoginLinks = document.getElementById("mobileLoginLinks");
+
+    btn.addEventListener("click", () => {
+      menu.classList.toggle("hidden");
+      menu.classList.toggle("block");
+    });
+
+    loginBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      loginDropdown.classList.toggle("hidden");
+      loginDropdown.classList.toggle("block");
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!document.getElementById("loginMenu").contains(event.target)) {
+        loginDropdown.classList.add("hidden");
+        loginDropdown.classList.remove("block");
+      }
+    });
+
+    mobileLoginBtn.addEventListener("click", () => {
+      mobileLoginLinks.classList.toggle("hidden");
+      mobileLoginLinks.classList.toggle("flex");
+    });
+  </script>
+</nav>

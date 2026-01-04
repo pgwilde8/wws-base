@@ -1,0 +1,75 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Testimonials{% endblock %}
+
+{% block content %}
+<section class="text-center py-16 px-4 bg-gradient-to-b from-gray-900 to-black">
+  <div class="max-w-4xl mx-auto">
+    <p class="text-sm uppercase tracking-[0.3em] text-emerald-300 mb-3">Client Stories</p>
+    <h1 class="text-4xl sm:text-5xl font-extrabold text-white mb-4">What Our Clients Say</h1>
+    <p class="text-lg text-gray-300">Real feedback from clients we've worked with</p>
+  </div>
+</section>
+
+<section class="py-12 px-4">
+  <div class="max-w-5xl mx-auto">
+    {% if testimonials %}
+    <div class="grid md:grid-cols-2 gap-6">
+      {% for testimonial in testimonials %}
+      <article class="bg-gray-900/70 border border-white/10 rounded-2xl p-6 shadow-lg">
+        <div class="flex items-start gap-4 mb-4">
+          <div class="flex-shrink-0 w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-300 font-bold text-xl">
+            {{ testimonial.client_name[0].upper() }}
+          </div>
+          <div class="flex-1">
+            <h3 class="text-lg font-bold text-white">{{ testimonial.client_name }}</h3>
+            {% if testimonial.client_location %}
+            <p class="text-sm text-gray-400">{{ testimonial.client_location }}</p>
+            {% endif %}
+            {% if testimonial.event_type %}
+            <p class="text-xs text-emerald-300 mt-1">{{ testimonial.event_type }}</p>
+            {% endif %}
+          </div>
+          {% if testimonial.rating %}
+          <div class="flex gap-0.5">
+            {% for i in range(testimonial.rating) %}
+            <span class="text-yellow-400">★</span>
+            {% endfor %}
+            {% for i in range(5 - testimonial.rating) %}
+            <span class="text-gray-600">★</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        
+        <p class="text-gray-300 mb-4 leading-relaxed">{{ testimonial.testimonial_text }}</p>
+        
+        <div class="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-white/5">
+          <span>{{ testimonial.created_at.strftime('%B %d, %Y') }}</span>
+          {% if testimonial.website_url %}
+          <a href="{{ testimonial.website_url }}" target="_blank" rel="noopener" class="text-emerald-400 hover:text-emerald-300">Visit Website →</a>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-16">
+      <div class="bg-gray-900/60 border border-white/10 rounded-2xl p-12 max-w-2xl mx-auto">
+        <h3 class="text-2xl font-bold text-white mb-3">No testimonials yet</h3>
+        <p class="text-gray-300 mb-6">Be the first to share your experience with us!</p>
+        <a href="/testimonials/submit" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-3 rounded-xl transition">Submit Testimonial</a>
+      </div>
+    </div>
+    {% endif %}
+    
+    <div class="mt-12 text-center">
+      <div class="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-700/40 rounded-2xl p-8 max-w-3xl mx-auto">
+        <h3 class="text-2xl font-bold text-white mb-3">Share Your Story</h3>
+        <p class="text-gray-200 mb-6">Have you worked with us? We'd love to hear about your experience!</p>
+        <a href="/testimonials/submit" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-3 rounded-xl transition">Submit Your Testimonial</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+
+  <h1 class="text-5xl sm:text-6xl font-extrabold text-emerald-400 mb-4">
+    Demo Project
+  </h1>
+
+  <p class="text-xl sm:text-2xl text-gray-300 max-w-2xl mb-6">
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus lacinia odio vitae vestibulum vestibulum.
+    Cras venenatis euismod malesuada. Nulla facilisi. Suspendisse potenti.
+  </p>
+
+  <a href="/contact" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-2xl shadow-lg transition">
+    Contact Us
+  </a>
+
+</div>
+
+<!-- Feature teaser section -->
+<section class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto mt-12 px-4">
+  <div class="bg-gray-800/40 backdrop-blur-sm p-6 rounded-2xl border border-gray-700">
+    <h3 class="text-2xl font-bold text-emerald-300 mb-2">Automated Workflows</h3>
+    <p class="text-gray-400">Quisque velit nisi, pretium ut lacinia in, elementum id enim.</p>
+  </div>
+
+  <div class="bg-gray-800/40 p-6 rounded-2xl border border-gray-700">
+    <h3 class="text-2xl font-bold text-cyan-200 mb-2">AI Integrations</h3>
+    <p class="text-gray-400">Curabitur aliquet quam id dui posuere blandit.</p>
+  </div>
+
+  <div class="bg-gray-800/40 p-6 rounded-2xl border border-gray-700">
+    <h3 class="text-2xl font-bold text-yellow-300 mb-2">24/7 Uptime</h3>
+    <p class="text-gray-400">Donec rutrum congue leo eget malesuada.</p>
+  </div>
+</section>
+
+<!-- Testimonials section -->
+<section class="max-w-6xl mx-auto mt-16 px-4">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <p class="text-sm uppercase tracking-[0.3em] text-emerald-300">Testimonials</p>
+      <h2 class="text-3xl font-extrabold text-white">What our clients say</h2>
+    </div>
+    <a href="/testimonials" class="text-sm text-emerald-300 hover:text-emerald-200">View all →</a>
+  </div>
+  {% if testimonials %}
+  <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for t in testimonials %}
+    <div class="p-6 rounded-2xl bg-gray-800/50 border border-white/5 shadow-lg">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center">{{ t.client_name[0]|upper }}</div>
+        <div>
+          <p class="text-white font-semibold">{{ t.client_name }}</p>
+          {% if t.event_type %}<p class="text-xs text-gray-400">{{ t.event_type }}</p>{% endif %}
+        </div>
+      </div>
+      <p class="text-gray-200 text-sm leading-relaxed">"{{ t.testimonial_text }}"</p>
+      <div class="text-xs text-gray-500 mt-3">
+        {% if t.rating %}Rating: {{ t.rating }}★ · {% endif %}
+        Submitted {{ t.created_at.strftime('%b %d, %Y') if t.created_at else 'recently' }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="p-6 rounded-2xl bg-gray-800/50 border border-white/5 text-gray-300">No testimonials published yet.</div>
+  {% endif %}
+</section>
+
+{% endblock %}

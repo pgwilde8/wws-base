@@ -1,0 +1,36 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<section class="max-w-4xl mx-auto px-4 py-16 space-y-10">
+	<header class="text-center space-y-3">
+		<p class="text-sm uppercase tracking-[0.3em] text-emerald-200">FAQ</p>
+		<h1 class="text-4xl sm:text-5xl font-extrabold text-white">Questions we hear often</h1>
+		<p class="text-lg text-gray-300">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante.</p>
+	</header>
+
+	<div class="space-y-4">
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 shadow">
+			<h3 class="text-lg font-semibold text-white">How do you isolate clients?</h3>
+			<p class="text-gray-300 mt-2">Curabitur blandit tempus porttitor. Maecenas faucibus mollis interdum. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor.</p>
+		</article>
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 shadow">
+			<h3 class="text-lg font-semibold text-white">Can we bring our own API keys?</h3>
+			<p class="text-gray-300 mt-2">Aenean lacinia bibendum nulla sed consectetur. Donec id elit non mi porta gravida at eget metus. Nulla vitae elit libero, a pharetra augue.</p>
+		</article>
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 shadow">
+			<h3 class="text-lg font-semibold text-white">Do you support migrations?</h3>
+			<p class="text-gray-300 mt-2">Etiam porta sem malesuada magna mollis euismod. Praesent commodo cursus magna, vel scelerisque nisl consectetur et.</p>
+		</article>
+		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-5 shadow">
+			<h3 class="text-lg font-semibold text-white">How fast can we launch?</h3>
+			<p class="text-gray-300 mt-2">Vestibulum id ligula porta felis euismod semper. Sed posuere consectetur est at lobortis. Nulla porttitor accumsan tincidunt.</p>
+		</article>
+	</div>
+
+	<div class="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 text-center space-y-3">
+		<h3 class="text-xl font-bold text-white">Still need answers?</h3>
+		<p class="text-gray-300">Phasellus commodo justo at velit ultricies, quis cursus dui porta.</p>
+		<a href="/contact" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-5 py-3 rounded-xl transition">Contact us</a>
+	</div>
+</section>
+{% endblock %}

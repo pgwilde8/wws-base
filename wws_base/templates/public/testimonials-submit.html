@@ -1,0 +1,113 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Submit Testimonial{% endblock %}
+
+{% block content %}
+<section class="text-center py-16 px-4 bg-gradient-to-b from-gray-900 to-black">
+  <div class="max-w-4xl mx-auto">
+    <p class="text-sm uppercase tracking-[0.3em] text-emerald-300 mb-3">Testimonials</p>
+    <h1 class="text-4xl sm:text-5xl font-extrabold text-white mb-4">Share Your Experience</h1>
+    <p class="text-lg text-gray-300">We'd love to hear about your experience with our services</p>
+  </div>
+</section>
+
+<section class="py-12 px-4">
+  <div class="max-w-3xl mx-auto">
+    {% if success %}
+    <div class="bg-emerald-500/10 border-l-4 border-emerald-500 rounded-lg p-4 mb-6">
+      <p class="text-emerald-200">{{ message }}</p>
+      <p class="text-gray-200 text-sm mt-1">Your submission is pending admin approval before it appears publicly.</p>
+    </div>
+    <div class="text-center space-x-4">
+      <a href="/testimonials" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-6 py-3 rounded-xl transition">View All Testimonials</a>
+      <a href="/" class="inline-block bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-3 rounded-xl transition">Return Home</a>
+    </div>
+    {% elif error %}
+    <div class="bg-red-500/10 border-l-4 border-red-500 rounded-lg p-4 mb-6">
+      <p class="text-red-200">{{ message }}</p>
+    </div>
+    {% endif %}
+    
+    {% if not success %}
+    <div class="bg-gray-900/70 border border-white/10 rounded-2xl p-8 shadow-xl">
+      <form method="POST" action="/testimonials/submit" class="space-y-6">
+        <div>
+          <label for="client_name" class="block text-sm font-semibold text-gray-300 mb-2">Your Name *</label>
+          <input type="text" id="client_name" name="client_name" required placeholder="John Smith" 
+            class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        
+        <div class="grid md:grid-cols-2 gap-6">
+          <div>
+            <label for="email" class="block text-sm font-semibold text-gray-300 mb-2">Email (Optional)</label>
+            <input type="email" id="email" name="email" placeholder="your@email.com" 
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <small class="text-gray-400 text-xs block mt-1">We won't display your email publicly</small>
+          </div>
+          
+          <div>
+            <label for="client_location" class="block text-sm font-semibold text-gray-300 mb-2">Location (Optional)</label>
+            <input type="text" id="client_location" name="client_location" placeholder="City, State" 
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+        </div>
+        
+        <div>
+          <label for="website_url" class="block text-sm font-semibold text-gray-300 mb-2">Website URL (Optional)</label>
+          <input type="url" id="website_url" name="website_url" placeholder="https://yourbusiness.com" 
+            class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <small class="text-gray-400 text-xs block mt-1">Share your business website for added credibility</small>
+        </div>
+        
+        <div class="grid md:grid-cols-2 gap-6">
+          <div>
+            <label for="event_type" class="block text-sm font-semibold text-gray-300 mb-2">Service Type (Optional)</label>
+            <select id="event_type" name="event_type" 
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="">Select...</option>
+              <option value="Web Development">Web Development</option>
+              <option value="Hosting">Hosting</option>
+              <option value="Maintenance">Maintenance</option>
+              <option value="Automation">Automation</option>
+              <option value="AI Integration">AI Integration</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          
+          <div>
+            <label for="rating" class="block text-sm font-semibold text-gray-300 mb-2">Rating (Optional)</label>
+            <select id="rating" name="rating" 
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="">Select...</option>
+              <option value="5">5 Stars - Excellent</option>
+              <option value="4">4 Stars - Very Good</option>
+              <option value="3">3 Stars - Good</option>
+              <option value="2">2 Stars - Fair</option>
+              <option value="1">1 Star - Poor</option>
+            </select>
+          </div>
+        </div>
+        
+        <div>
+          <label for="testimonial_text" class="block text-sm font-semibold text-gray-300 mb-2">Your Testimonial *</label>
+          <textarea id="testimonial_text" name="testimonial_text" rows="6" required 
+            placeholder="Tell us about your experience... What did you like? How did our services help?" 
+            class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-vertical"></textarea>
+          <small class="text-gray-400 text-xs block mt-1">Your testimonial will be reviewed before being published.</small>
+        </div>
+        
+        <button type="submit" 
+          class="w-full py-3 rounded-xl font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:opacity-95 text-white transition">
+          Submit Testimonial
+        </button>
+      </form>
+    </div>
+    
+    <div class="bg-gray-900/50 border-l-4 border-emerald-500 rounded-lg p-6 mt-8">
+      <h3 class="text-xl font-bold text-white mb-2">Thank You!</h3>
+      <p class="text-gray-300">We truly appreciate you taking the time to share your experience. Your feedback helps us improve and helps others discover our services.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
