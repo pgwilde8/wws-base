@@ -6,3 +6,5 @@ python-dotenv
 passlib[bcrypt]
 itsdangerous
 openai
+jinja2
+python-multipart

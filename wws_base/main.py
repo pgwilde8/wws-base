@@ -16,7 +16,8 @@ app = FastAPI(title="WebWise Solutions Base Template")
 
 # optional: define a router if you want to group routes
 router = APIRouter()
-templates = Jinja2Templates(directory="/srv/projects/wws-base/wws_base/templates")
+_BASE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=str(_BASE_DIR / "templates"))
 
 # Database connection
 try:
@@ -46,7 +47,7 @@ ASSISTANT_ID = os.getenv("ASSISTANT_ID")
 openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # mount static folder
-app.mount("/static", StaticFiles(directory="/srv/projects/wws-base/wws_base/static"), name="static")
+app.mount("/static", StaticFiles(directory=str(_BASE_DIR / "static")), name="static")
 
 # session helpers
 def _serializer() -> URLSafeTimedSerializer:
