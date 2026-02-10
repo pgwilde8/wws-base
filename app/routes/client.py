@@ -444,3 +444,78 @@ def view_savings_page(request: Request, user: Optional[Dict] = Depends(current_u
             "savings_data": savings_data
         }
     )
+
+
+@router.get("/savings-test")
+def savings_test_endpoint(mc_number: str = "MC_998877"):
+    """
+    Test endpoint for savings dashboard - no auth required.
+    Useful for quick testing without login.
+    """
+    if not engine:
+        return {"error": "Database not available"}
+    
+    with engine.begin() as conn:
+        # Get total balance
+        total_query = text("""
+            SELECT COALESCE(SUM(amount_candle), 0) as total
+            FROM webwise.driver_savings_ledger
+            WHERE driver_mc_number = :mc
+        """)
+        total_result = conn.execute(total_query, {"mc": mc_number}).first()
+        total_balance = float(total_result.total) if total_result else 0.0
+
+        # Get next unlock date
+        next_unlock_query = text("""
+            SELECT unlocks_at
+            FROM webwise.driver_savings_ledger
+            WHERE driver_mc_number = :mc
+              AND status = 'LOCKED'
+            ORDER BY unlocks_at ASC
+            LIMIT 1
+        """)
+        next_unlock_result = conn.execute(next_unlock_query, {"mc": mc_number}).first()
+        next_vesting_date = next_unlock_result.unlocks_at if next_unlock_result else None
+
+        # Calculate days until unlock
+        days_until_unlock = None
+        if next_vesting_date:
+            delta = next_vesting_date - datetime.now(next_vesting_date.tzinfo)
+            days_until_unlock = max(0, delta.days) if delta.total_seconds() > 0 else 0
+
+        # Get recent transactions
+        history_query = text("""
+            SELECT 
+                load_id,
+                amount_usd,
+                amount_candle,
+                earned_at,
+                unlocks_at,
+                status
+            FROM webwise.driver_savings_ledger
+            WHERE driver_mc_number = :mc
+            ORDER BY earned_at DESC
+            LIMIT 5
+        """)
+        history_rows = conn.execute(history_query, {"mc": mc_number}).fetchall()
+
+        recent_transactions = [
+            {
+                "load_id": row.load_id,
+                "amount_usd": float(row.amount_usd),
+                "amount_candle": float(row.amount_candle),
+                "earned_date": row.earned_at.isoformat() if row.earned_at else None,
+                "unlocks_date": row.unlocks_at.isoformat() if row.unlocks_at else None,
+                "status": row.status,
+            }
+            for row in history_rows
+        ]
+
+    return {
+        "mc_number": mc_number,
+        "total_candle_balance": total_balance,
+        "next_vesting_date": next_vesting_date.isoformat() if next_vesting_date else None,
+        "days_until_unlock": days_until_unlock,
+        "recent_transactions": recent_transactions,
+        "note": "Test endpoint - use ?mc_number=MC_XXXXX to test different drivers"
+    }
