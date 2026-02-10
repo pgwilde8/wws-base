@@ -1,0 +1,18 @@
+<div class="notification-toast pointer-events-auto bg-gray-900 border-2 border-green-500 p-4 rounded-2xl shadow-2xl flex items-start gap-4 max-w-sm" data-notification-id="{{ notification.id }}">
+  <div class="bg-green-500/20 p-2 rounded-full text-green-400 shrink-0">
+    {% if notification.notif_type == 'LOAD_WON' %}
+    💰
+    {% else %}
+    🤖
+    {% endif %}
+  </div>
+  <div class="flex-1 min-w-0">
+    <p class="text-white text-sm font-bold">{{ notification.message }}</p>
+    <button hx-post="/clients/notifications/{{ notification.id }}/read"
+            hx-target="closest .notification-toast"
+            hx-swap="outerHTML"
+            class="mt-2 text-xs text-green-400 font-black uppercase hover:underline">
+      Dismiss
+    </button>
+  </div>
+</div>

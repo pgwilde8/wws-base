@@ -1,0 +1,147 @@
+# bootstrap_db.py
+# Export Base (and optionally engine) for ORM models. Run this file as a script to create schema and seed.
+import os
+from pathlib import Path
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import declarative_base
+
+Base = declarative_base()
+
+try:
+    from dotenv import load_dotenv
+    _base_dir = Path(__file__).resolve().parent.parent
+    load_dotenv(_base_dir / ".env")
+except ImportError:
+    pass
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL, echo=True, future=True) if DATABASE_URL else None
+
+
+def _hash_password(password: str) -> str:
+    """Hash for bootstrap seeding. Use bcrypt directly to avoid passlib/bcrypt 4.1+ issues."""
+    try:
+        import bcrypt
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    except Exception as e:
+        raise RuntimeError("bcrypt is required for bootstrap; pip install bcrypt") from e
+
+
+def run_bootstrap():
+    """Create webwise schema, tables, and seed data. Call when running this file as __main__."""
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL not set in environment")
+    eng = create_engine(DATABASE_URL, echo=True, future=True)
+    with eng.begin() as conn:
+        conn.execute(text("CREATE SCHEMA IF NOT EXISTS webwise;"))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.projects (
+                id SERIAL PRIMARY KEY,
+                client_name VARCHAR(120) NOT NULL,
+                project_title VARCHAR(200) NOT NULL,
+                created_at TIMESTAMP DEFAULT now()
+            );
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.testimonials (
+                id SERIAL PRIMARY KEY,
+                client_name VARCHAR(120) NOT NULL,
+                email VARCHAR(200),
+                client_location VARCHAR(200),
+                website_url VARCHAR(300),
+                event_type VARCHAR(100),
+                rating INTEGER,
+                testimonial_text TEXT NOT NULL,
+                is_approved BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT now()
+            );
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.negotiations (
+                id SERIAL PRIMARY KEY,
+                load_id VARCHAR(64),
+                origin VARCHAR(255),
+                destination VARCHAR(255),
+                original_rate FLOAT,
+                target_rate FLOAT,
+                final_rate FLOAT,
+                ai_draft_subject VARCHAR(500),
+                ai_draft_body TEXT,
+                broker_reply TEXT,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT now(),
+                updated_at TIMESTAMP
+            );
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.users (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                role VARCHAR(20) NOT NULL DEFAULT 'admin',
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT now(),
+                last_login TIMESTAMP
+            );
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.trucker_profiles (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES webwise.users(id),
+                display_name VARCHAR(120) NOT NULL,
+                carrier_name VARCHAR(200),
+                truck_identifier VARCHAR(80),
+                mc_number VARCHAR(50),
+                created_at TIMESTAMP DEFAULT now(),
+                updated_at TIMESTAMP
+            );
+        """))
+        conn.execute(text("""
+            DO $$ BEGIN
+                ALTER TABLE webwise.negotiations
+                ADD COLUMN trucker_id INTEGER REFERENCES webwise.trucker_profiles(id);
+            EXCEPTION WHEN duplicate_column THEN NULL;
+            END $$;
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.notifications (
+                id SERIAL PRIMARY KEY,
+                trucker_id INTEGER NOT NULL REFERENCES webwise.trucker_profiles(id),
+                message VARCHAR(500) NOT NULL,
+                notif_type VARCHAR(50) NOT NULL DEFAULT 'info',
+                is_read BOOLEAN NOT NULL DEFAULT false,
+                created_at TIMESTAMP DEFAULT now()
+            );
+        """))
+        existing = conn.execute(text("SELECT COUNT(*) FROM webwise.projects;")).scalar()
+        if existing == 0:
+            conn.execute(text("""
+                INSERT INTO webwise.projects (client_name, project_title)
+                VALUES ('Demo Client', 'Latin Placeholder Project');
+            """))
+        admin_count = conn.execute(text("SELECT COUNT(*) FROM webwise.users WHERE role='admin';")).scalar()
+        if admin_count == 0:
+            seed_email = os.getenv("ADMIN_EMAIL", "admin@example.com")
+            seed_password = (os.getenv("ADMIN_PASSWORD") or "changeme123")[:72]
+            pw_hash = _hash_password(seed_password)
+            conn.execute(text("""
+                INSERT INTO webwise.users (email, password_hash, role, is_active)
+                VALUES (:email, :password_hash, 'admin', true)
+            """), {"email": seed_email, "password_hash": pw_hash})
+        client_email = os.getenv("CLIENT_EMAIL")
+        client_password = os.getenv("CLIENT_PASSWORD")
+        if client_email and client_password:
+            existing_client = conn.execute(text("SELECT COUNT(*) FROM webwise.users WHERE email = :email"), {"email": client_email}).scalar()
+            if existing_client == 0:
+                client_pw_hash = _hash_password((client_password or "")[:72])
+                conn.execute(text("""
+                    INSERT INTO webwise.users (email, password_hash, role, is_active)
+                    VALUES (:email, :password_hash, 'client', true)
+                """), {"email": client_email, "password_hash": client_pw_hash})
+                print(f"Seeded client user: {client_email}")
+    print("Bootstrap complete: schema 'webwise' and tables ready.")
+
+
+if __name__ == "__main__":
+    run_bootstrap()

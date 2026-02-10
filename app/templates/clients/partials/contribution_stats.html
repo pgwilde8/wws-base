@@ -1,0 +1,16 @@
+<div id="contribution-stats" class="grid grid-cols-2 gap-4">
+  <div class="stat">
+    <div class="text-3xl font-black text-white">{{ stats.win_count }}</div>
+    <div class="text-xs text-gray-500 font-medium">Negotiated Wins</div>
+  </div>
+  <div class="stat text-right">
+    <div class="text-3xl font-black text-green-400">${{ "{:,.2f}".format(stats.candle_contribution_usd) }}</div>
+    <div class="text-xs text-gray-500 font-medium">$CANDLE Buyback</div>
+  </div>
+  <div class="col-span-2 mt-4 pt-4 border-t border-gray-700">
+    <div class="flex justify-between items-center text-xs">
+      <span class="text-gray-400">Total Revenue Generated:</span>
+      <span class="text-white font-mono">${{ "{:,.2f}".format(stats.total_revenue) }}</span>
+    </div>
+  </div>
+</div>

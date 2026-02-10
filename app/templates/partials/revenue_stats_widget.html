@@ -1,0 +1,11 @@
+<div class="bg-green-900/20 p-6 rounded-2xl border border-green-500/40">
+  <h3 class="text-green-400 font-bold uppercase tracking-wider text-sm">Buyback Engine</h3>
+  <div class="mt-2 flex items-baseline gap-2">
+    <span class="text-3xl font-black text-white">${{ "%.2f"|format(pending_buyback) }}</span>
+    <span class="text-green-500 text-xs font-bold">Pending Buyback</span>
+  </div>
+  <p class="text-gray-400 text-xs mt-1">Calculated from 2% of completed "Wins"</p>
+  {% if win_count is defined and win_count is number %}
+  <p class="text-gray-500 text-xs mt-2">{{ win_count }} win{{ 's' if win_count != 1 else '' }} · ${{ "%.2f"|format(total_revenue|default(0)) }} revenue</p>
+  {% endif %}
+</div>

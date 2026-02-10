@@ -1,0 +1,56 @@
+{% extends "layout/base.html" %}
+{% block content %}
+<script src="https://unpkg.com/htmx.org@1.9.10" crossorigin="anonymous"></script>
+
+<!-- Audio ping when new notification arrives (add /static/audio/ping.mp3; sonar/cash-register style) -->
+<audio id="notif-sound" preload="auto" class="hidden">
+  <source src="/static/audio/ping.mp3" type="audio/mpeg">
+</audio>
+<script>
+  document.body.addEventListener('playNotificationSound', function () {
+    var el = document.getElementById('notif-sound');
+    if (el) el.play().catch(function () {});
+  });
+</script>
+<!-- Invisible watcher: poll every 30s, replace container with unread toasts -->
+<div hx-get="/clients/notifications/poll"
+     hx-trigger="load, every 30s"
+     hx-target="#notification-container"
+     hx-swap="innerHTML">
+</div>
+<div id="notification-container" class="fixed top-5 right-5 z-50 space-y-4 max-w-sm w-full pointer-events-none">
+</div>
+
+<div class="p-6 max-w-4xl mx-auto">
+  <h1 class="text-3xl font-extrabold text-white mb-2">Client Dashboard</h1>
+  <p class="text-gray-400 mb-6">Manage your loads and see your impact on the Green Candle network.</p>
+
+  <!-- My Green Candle Impact (HTMX lazy-load + live refresh on contributionUpdated) -->
+  <div class="bg-gray-800 rounded-2xl p-6 border border-green-500/20 shadow-xl mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-gray-400 text-sm font-bold uppercase tracking-widest">My Green Candle Impact</h3>
+      <span class="htmx-indicator animate-pulse h-2 w-2 bg-green-500 rounded-full"></span>
+    </div>
+    <div hx-get="/clients/my-contribution"
+         hx-trigger="load, contributionUpdated from:body"
+         hx-swap="innerHTML"
+         class="min-h-[80px]">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="animate-pulse bg-gray-700 h-16 rounded-xl"></div>
+        <div class="animate-pulse bg-gray-700 h-16 rounded-xl"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="bg-gray-800/60 p-6 rounded-xl border border-white/10">
+      <h2 class="text-xl font-bold text-white mb-2">Your Loads</h2>
+      <p class="text-gray-400 text-sm">Negotiated loads and active dispatches appear here.</p>
+    </div>
+    <div class="bg-gray-800/60 p-6 rounded-xl border border-white/10">
+      <h2 class="text-xl font-bold text-white mb-2">Account Settings</h2>
+      <p class="text-gray-400 text-sm">Update your trucker profile and preferences.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

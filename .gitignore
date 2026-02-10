@@ -32,3 +32,10 @@ dist/
 
 # Logs
 *.log
+
+# Local DB (if you ever use SQLite for dev)
+*.sqlite3
+*.db
+
+# Cursor
+.cursor/

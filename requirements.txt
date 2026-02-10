@@ -3,7 +3,7 @@ uvicorn[standard]
 sqlalchemy
 psycopg2-binary
 python-dotenv
-passlib[bcrypt]
+bcrypt
 itsdangerous
 openai
 jinja2
