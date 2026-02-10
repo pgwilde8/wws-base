@@ -1,8 +1,11 @@
 134.199.241.56:8990
+134.199.241.56:8990/savings-view
+
 cd /srv/projects/client/dispatch
 source .venv/bin/activate
 
 uvicorn app.main:app --host 0.0.0.0 --port 8990
+uvicorn app.main:app --host 0.0.0.0 --port 8990 --reload --log-level debug --access-log
 
 tree /srv/projects/client/dispatch
 tree /srv/projects/client/dispatch/app/api/v1/__pycache__
@@ -11,5 +14,5 @@ tree /srv/projects/client/dispatch/app/api/v1/__pycache__
 # git remote set-url origin https://YOUR_TOKEN@github.com/pgwilde8/dispatch.git
 
 git add -A
-git commit -m "Your message"
+git commit -m "started env"
 git push -u origin main

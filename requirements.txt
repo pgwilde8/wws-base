@@ -8,3 +8,4 @@ itsdangerous
 openai
 jinja2
 python-multipart
+boto3
