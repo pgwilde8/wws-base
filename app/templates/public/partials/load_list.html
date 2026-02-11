@@ -1,0 +1,20 @@
+{% for load in loads %}
+<div class="bg-gray-800 p-4 rounded-lg border-l-4 border-green-500 shadow-md mb-3">
+	<div class="flex justify-between items-center">
+		<div>
+			<h3 class="font-bold text-lg text-white">{{ load.origin }} ➡️ {{ load.destination }}</h3>
+			<p class="text-gray-400 text-sm">{{ load.type }} | {{ load.miles }} miles</p>
+		</div>
+		<div class="text-right">
+			<p class="text-green-400 font-bold text-xl">${{ "{:,.0f}".format(load.price) }}</p>
+			<button 
+				hx-post="/negotiate/{{ load.id }}" 
+				hx-target="closest div"
+				hx-swap="outerHTML"
+				class="mt-2 bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded-md transition">
+				Agent Negotiate
+			</button>
+		</div>
+	</div>
+</div>
+{% endfor %}

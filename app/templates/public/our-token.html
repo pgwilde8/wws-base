@@ -1,0 +1,144 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<section class="max-w-4xl mx-auto px-4 py-16 space-y-12">
+    
+    <header class="text-center space-y-4">
+        <div class="inline-block bg-green-900/30 border border-green-500/30 rounded-full px-4 py-1 mb-2">
+            <span class="text-green-400 text-xs font-bold uppercase tracking-widest">The Green Candle Protocol</span>
+        </div>
+        <h1 class="text-4xl sm:text-6xl font-black text-white">The $CANDLE Token</h1>
+        <p class="text-xl text-slate-400 max-w-2xl mx-auto">
+            Fueling the First Driver-Owned AI Dispatch Network on <span class="text-blue-400 font-bold">Base</span>.
+        </p>
+    </header>
+
+    <section class="space-y-8">
+        <div class="grid md:grid-cols-2 gap-6">
+            <article class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-lg hover:border-green-500/30 transition">
+                <div class="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-4 border border-slate-700">
+                    <span class="text-2xl">🕯️</span>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">What is $CANDLE?</h3>
+                <p class="text-slate-300 leading-relaxed">
+                    $CANDLE is a utility token on the <strong class="text-blue-400">Base Network</strong> (Coinbase). It's not just "internet money"—it's a rebate mechanism. Instead of your dispatch fees disappearing into a corporate bank account, they are converted into digital property that you own.
+                </p>
+            </article>
+
+            <article class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-lg hover:border-green-500/30 transition">
+                <div class="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-4 border border-slate-700">
+                    <span class="text-2xl">⚙️</span>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">The Buyback Engine</h3>
+                <p class="text-slate-300 leading-relaxed">
+                    Every time you haul a load, the <strong>2% Network Fee</strong> is used to market-buy $CANDLE from the open exchange. This creates constant, programmatic demand for the token, regardless of market conditions.
+                </p>
+            </article>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 relative overflow-hidden">
+            <div class="absolute top-0 left-1/2 transform -translate-x-1/2 w-64 h-64 bg-green-500/10 rounded-full blur-3xl -z-10"></div>
+            
+            <h3 class="text-2xl font-bold text-white text-center mb-8">Where does the fee go?</h3>
+            
+            <div class="grid md:grid-cols-3 gap-8 text-center items-center">
+                <div class="bg-slate-800/50 p-6 rounded-xl border border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.2)]">
+                    <div class="text-sm uppercase text-green-400 font-bold tracking-wider mb-2">Driver Share</div>
+                    <div class="text-4xl font-black text-white mb-2">75%</div>
+                    <p class="text-xs text-slate-400">Sent to your personal Savings Vault (Locked for 6 months).</p>
+                </div>
+
+                <div class="hidden md:block text-slate-600 text-2xl">
+                    <i class="fas fa-plus"></i>
+                </div>
+
+                <div class="bg-slate-800/50 p-6 rounded-xl border border-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.2)]">
+                    <div class="text-sm uppercase text-orange-400 font-bold tracking-wider mb-2">The Burn</div>
+                    <div class="text-4xl font-black text-white mb-2">25%</div>
+                    <p class="text-xs text-slate-400">Permanently destroyed to reduce supply and increase scarcity.</p>
+                </div>
+            </div>
+            
+            <p class="text-center text-slate-400 text-sm mt-8 max-w-2xl mx-auto">
+                <strong>Why burn it?</strong> By destroying 25% of every fee, we make the tokens in your vault scarcer. It's a deflationary mechanism designed to reward long-term holders.
+            </p>
+        </div>
+    </section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col md:flex-row gap-8 items-center">
+        <div class="flex-1">
+            <h2 class="text-2xl font-bold text-white mb-4 flex items-center">
+                <span class="mr-3">🔐</span> The 6-Month Rolling Lock
+            </h2>
+            <p class="text-slate-300 mb-4">
+                To ensure network stability, all driver rewards are locked for <strong>180 days</strong> from the moment they are earned.
+            </p>
+            <ul class="space-y-2 text-sm text-slate-400">
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Prevents "dumping" and protects price.</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Creates a "forced savings" retirement fund.</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Starts a weekly income stream after Month 6.</li>
+            </ul>
+        </div>
+        <div class="bg-slate-950 p-6 rounded-xl border border-slate-800 w-full md:w-auto min-w-[300px]">
+            <div class="flex justify-between text-sm mb-2 border-b border-slate-800 pb-2">
+                <span class="text-slate-500">Status</span>
+                <span class="text-white">Amount</span>
+            </div>
+            <div class="flex justify-between text-sm mb-2">
+                <span class="text-orange-400"><i class="fas fa-lock text-xs mr-1"></i> Locked</span>
+                <span class="text-white font-mono">15,420 $CANDLE</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-green-400"><i class="fas fa-lock-open text-xs mr-1"></i> Vested</span>
+                <span class="text-white font-mono">2,500 $CANDLE</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="relative bg-gradient-to-r from-slate-900 to-green-900/20 border border-slate-700 rounded-2xl p-8 overflow-hidden">
+        <div class="relative z-10">
+            <h2 class="text-3xl font-bold text-white mb-6">The Goal: The Green Candle Card</h2>
+            <p class="text-slate-300 mb-8 max-w-xl">
+                The 6-month wait is worth it. Once your tokens unlock, we make spending them as easy as swiping at the pump.
+            </p>
+            
+            <div class="grid sm:grid-cols-2 gap-4 max-w-2xl">
+                <div class="flex items-start gap-3">
+                    <div class="bg-green-500/10 p-2 rounded text-green-400"><i class="fas fa-bolt"></i></div>
+                    <div>
+                        <h4 class="text-white font-bold text-sm">Powered by UPay</h4>
+                        <p class="text-slate-400 text-xs">Instant crypto-to-fiat conversion.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <div class="bg-green-500/10 p-2 rounded text-green-400"><i class="fas fa-globe"></i></div>
+                    <div>
+                        <h4 class="text-white font-bold text-sm">Spend Anywhere</h4>
+                        <p class="text-slate-400 text-xs">Accepted wherever Visa is.</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <div class="bg-green-500/10 p-2 rounded text-green-400"><i class="fas fa-university"></i></div>
+                    <div>
+                        <h4 class="text-white font-bold text-sm">No Bank Needed</h4>
+                        <p class="text-slate-400 text-xs">You are your own bank.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="hidden md:block absolute top-8 right-8 w-64 h-40 bg-gradient-to-br from-green-400 to-emerald-800 rounded-xl shadow-2xl transform rotate-6 border border-white/20 flex items-end p-4">
+            <div class="text-white font-mono text-sm tracking-widest opacity-80">•••• 4242</div>
+        </div>
+    </section>
+
+    <div class="text-center pt-8">
+        <h3 class="text-2xl font-bold text-white mb-4">Start Filling Your Stash Today</h3>
+        <p class="text-slate-400 mb-8">Join the fleet and start earning $CANDLE rewards on every load.</p>
+        <a href="/register-trucker" class="inline-block bg-green-500 hover:bg-green-400 text-slate-900 font-bold px-10 py-4 rounded-xl transition shadow-lg shadow-green-900/20 transform hover:-translate-y-1">
+            Join the Fleet
+        </a>
+    </div>
+
+</section>
+{% endblock %}

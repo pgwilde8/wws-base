@@ -1,140 +1,145 @@
 {% extends "layout/base.html" %}
 
 {% block content %}
-<!-- Under construction banner -->
-<div class="bg-amber-500/20 border-b border-amber-500/40 py-3 px-4 text-center">
-  <p class="text-amber-300 font-semibold text-sm sm:text-base tracking-wide">
-    🚧 Under construction — We're building the future of small-fleet logistics. Launching soon.
-  </p>
-</div>
 
-<div class="flex flex-col items-center justify-center text-center px-4 pt-12 pb-8">
-  <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-emerald-400 mb-3">
-    Green Candle Dispatch
-  </h1>
-  <p class="text-lg sm:text-xl text-emerald-200/90 font-medium mb-2">
-    🕯️ DePIN for the open road
-  </p>
-  <p class="text-xl sm:text-2xl text-gray-300 max-w-2xl mb-8">
-    Real-yield logistics. We eliminate administrative bloat and deadhead miles for owner-operators—and turn every paid mile into programmatic buyback of <strong class="text-amber-400">$CANDLE</strong>.
-  </p>
-  <a href="/contact" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-8 rounded-2xl shadow-lg transition">
-    Get in touch
-  </a>
-</div>
-
-<!-- What it is -->
-<section class="max-w-4xl mx-auto px-4 py-10">
-  <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6 text-center">What is Green Candle Dispatch?</h2>
-  <p class="text-gray-300 text-lg leading-relaxed mb-6">
-    We're a <strong class="text-emerald-300">Decentralized Physical Infrastructure Network (DePIN)</strong> SaaS for small trucking fleets (1–5 trucks). Owner-operators outsource rate negotiation and paperwork to an <strong class="text-emerald-300">autonomous AI Dispatcher</strong>. Every successful mile strengthens the network through a programmatic token buyback—no speculation, just real freight and real yield.
-  </p>
-  <div class="grid sm:grid-cols-3 gap-4 text-center">
-    <div class="bg-gray-800/40 p-4 rounded-xl border border-gray-700">
-      <p class="text-amber-400 font-bold text-sm uppercase tracking-wider mb-1">The problem</p>
-      <p class="text-gray-400 text-sm">15+ hrs/week on paperwork. 3–5% to factoring. Empty miles from slow load matching.</p>
-    </div>
-    <div class="bg-gray-800/40 p-4 rounded-xl border border-gray-700">
-      <p class="text-emerald-400 font-bold text-sm uppercase tracking-wider mb-1">The solution</p>
-      <p class="text-gray-400 text-sm">AI handles brokers & BOLs. One-tap uploads. $CANDLE rewards for every mile you deliver.</p>
-    </div>
-    <div class="bg-gray-800/40 p-4 rounded-xl border border-gray-700">
-      <p class="text-cyan-300 font-bold text-sm uppercase tracking-wider mb-1">Proof of Freight</p>
-      <p class="text-gray-400 text-sm">2% network fee per load → instant market buy of $CANDLE on Base. Constant, non-speculative buy pressure.</p>
-    </div>
-  </div>
-</section>
-
-<!-- Key features -->
-<section class="max-w-5xl mx-auto px-4 py-10">
-  <p class="text-sm uppercase tracking-[0.3em] text-emerald-300 text-center mb-4">Coming in V1</p>
-  <h2 class="text-2xl sm:text-3xl font-bold text-white mb-8 text-center">What we're building</h2>
-  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-    <div class="bg-gray-800/40 backdrop-blur-sm p-6 rounded-2xl border border-gray-700">
-      <h3 class="text-xl font-bold text-emerald-300 mb-2">🤖 AI Dispatcher</h3>
-      <p class="text-gray-400">24/7 load-board monitoring. Automated broker outreach and rate negotiation via email.</p>
-    </div>
-    <div class="bg-gray-800/40 p-6 rounded-2xl border border-gray-700">
-      <h3 class="text-xl font-bold text-cyan-200 mb-2">📄 One-tap BOL</h3>
-      <p class="text-gray-400">Upload a photo; AI extracts data and prepares it for factoring. No more paperwork tax.</p>
-    </div>
-    <div class="bg-gray-800/40 p-6 rounded-2xl border border-gray-700">
-      <h3 class="text-xl font-bold text-amber-300 mb-2">🕯️ $CANDLE buyback</h3>
-      <p class="text-gray-400">2% network fee from every paid load → Transak–Stripe bridge → market buy on Base (Uniswap).</p>
-    </div>
-  </div>
-</section>
-
-<!-- Milestone / vision -->
-<section class="max-w-3xl mx-auto px-4 py-10 text-center">
-  <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-8">
-    <p class="text-emerald-300 font-semibold mb-2">Real-yield milestone</p>
-    <p class="text-2xl sm:text-3xl font-bold text-white">50 trucks × $7.5k/week ≈ <span class="text-amber-400">$30,000/month</span> in automated buy pressure.</p>
-    <p class="text-gray-400 mt-4 text-sm">$CANDLE is the currency of the open road. We're building it.</p>
-  </div>
-</section>
-
-<!-- Tokenomics & Utility (investor-facing) -->
-<section class="max-w-4xl mx-auto px-4 py-12 border-t border-white/10">
-  <p class="text-sm uppercase tracking-[0.3em] text-amber-400 text-center mb-2">For Investors</p>
-  <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6 text-center">Tokenomics & Utility</h2>
-  <p class="text-gray-300 text-lg leading-relaxed mb-8 text-center max-w-2xl mx-auto">
-    $CANDLE is not backed by speculation. It is backed by <strong class="text-emerald-300">verified freight revenue</strong>. Every load we help win generates a 2% network fee that is converted into a market buy of $CANDLE on Base—creating sustained, non-inflationary demand.
-  </p>
-  <div class="grid md:grid-cols-2 gap-6 text-left">
-    <div class="bg-gray-800/50 rounded-2xl p-6 border border-emerald-500/20">
-      <h3 class="text-lg font-bold text-emerald-300 mb-3">Real-world yield</h3>
-      <ul class="space-y-2 text-gray-300 text-sm">
-        <li class="flex items-start gap-2"><span class="text-emerald-400 shrink-0">▸</span> No new buyers required. Revenue comes from trucks moving freight.</li>
-        <li class="flex items-start gap-2"><span class="text-emerald-400 shrink-0">▸</span> 2% of every "Win" (booked load) flows to the buyback pool.</li>
-        <li class="flex items-start gap-2"><span class="text-emerald-400 shrink-0">▸</span> Transak bridge converts USD to $CANDLE on Uniswap (Base).</li>
-      </ul>
-    </div>
-    <div class="bg-gray-800/50 rounded-2xl p-6 border border-emerald-500/20">
-      <h3 class="text-lg font-bold text-emerald-300 mb-3">Verified network</h3>
-      <ul class="space-y-2 text-gray-300 text-sm">
-        <li class="flex items-start gap-2"><span class="text-emerald-400 shrink-0">▸</span> Every driver onboarded with <strong class="text-white">MC Number</strong> and carrier identity.</li>
-        <li class="flex items-start gap-2"><span class="text-emerald-400 shrink-0">▸</span> Not wallets—real logistics nodes generating real ton-miles.</li>
-        <li class="flex items-start gap-2"><span class="text-emerald-400 shrink-0">▸</span> Dashboard tracks pending buyback and per-driver contribution live.</li>
-      </ul>
-    </div>
-  </div>
-  <p class="text-gray-500 text-sm text-center mt-8 max-w-xl mx-auto">
-    This is the "Proof of Freight" model: value accrues to the token from real operations, not from the next investor buying in.
-  </p>
-</section>
-
-<!-- Testimonials (optional; keep if you want social proof later) -->
-<section class="max-w-6xl mx-auto mt-12 px-4 pb-16">
-  <div class="flex items-center justify-between mb-6">
-    <div>
-      <p class="text-sm uppercase tracking-[0.3em] text-emerald-300">Testimonials</p>
-      <h2 class="text-3xl font-extrabold text-white">What our clients say</h2>
-    </div>
-    <a href="/testimonials" class="text-sm text-emerald-300 hover:text-emerald-200">View all →</a>
-  </div>
-  {% if testimonials %}
-  <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-    {% for t in testimonials %}
-    <div class="p-6 rounded-2xl bg-gray-800/50 border border-white/5 shadow-lg">
-      <div class="flex items-center gap-3 mb-3">
-        <div class="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center">{{ t.client_name[0]|upper }}</div>
-        <div>
-          <p class="text-white font-semibold">{{ t.client_name }}</p>
-          {% if t.event_type %}<p class="text-xs text-gray-400">{{ t.event_type }}</p>{% endif %}
+<div class="relative bg-slate-900 overflow-hidden">
+    <div class="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center"></div>
+    
+    <div class="relative flex flex-col items-center justify-center text-center px-4 pt-20 pb-16 z-10">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-900/50 border border-green-500/30 text-green-400 text-xs font-bold uppercase tracking-widest mb-6">
+            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            Accepting Beta Owner-Operators
         </div>
-      </div>
-      <p class="text-gray-200 text-sm leading-relaxed">"{{ t.testimonial_text }}"</p>
-      <div class="text-xs text-gray-500 mt-3">
-        {% if t.rating %}Rating: {{ t.rating }}★ · {% endif %}
-        Submitted {{ t.created_at.strftime('%b %d, %Y') if t.created_at else 'recently' }}
-      </div>
+
+        <h1 class="text-4xl sm:text-6xl font-black text-white mb-4 tracking-tight">
+            Drive the Truck.<br>
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">
+                We'll Fight for the Rate.
+            </span>
+        </h1>
+        
+        <p class="text-lg sm:text-xl text-slate-300 max-w-2xl mb-10 leading-relaxed">
+            Stop refreshing load boards at 2 AM. Our <strong>AI Dispatcher</strong> scans thousands of loads, filters out the junk, and negotiates the highest rate for you automatically.
+        </p>
+        
+        <div class="flex flex-col sm:flex-row gap-4">
+            <a href="/register" class="bg-green-500 hover:bg-green-400 text-slate-900 font-bold py-4 px-8 rounded-xl shadow-lg shadow-green-900/20 transition transform hover:-translate-y-1">
+                Start Hauling
+            </a>
+            <a href="#how-it-works" class="bg-slate-800 hover:bg-slate-700 text-white font-semibold py-4 px-8 rounded-xl border border-slate-700 transition">
+                See How It Works
+            </a>
+        </div>
     </div>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="p-6 rounded-2xl bg-gray-800/50 border border-white/5 text-gray-400 text-center">No testimonials published yet. Coming with our alpha fleet.</div>
-  {% endif %}
+</div>
+
+<section class="bg-slate-950 py-16 px-4 border-y border-slate-800">
+    <div class="max-w-6xl mx-auto">
+        <div class="grid md:grid-cols-3 gap-8">
+            <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800 hover:border-green-500/30 transition group">
+                <div class="w-14 h-14 bg-slate-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-green-900/20 transition">
+                    <i class="fas fa-robot text-2xl text-green-400"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-3">AI Negotiation</h3>
+                <p class="text-slate-400 leading-relaxed">
+                    Brokers try to lowball you. Our AI counters instantly with market data. It doesn't sleep, it doesn't get tired, and it fights for every cent per mile.
+                </p>
+            </div>
+
+            <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800 hover:border-green-500/30 transition group">
+                <div class="w-14 h-14 bg-slate-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-green-900/20 transition">
+                    <i class="fas fa-file-invoice-dollar text-2xl text-green-400"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-3">Instant Paperwork</h3>
+                <p class="text-slate-400 leading-relaxed">
+                    Hate scanning BOLs at a truck stop? Just snap a photo. We auto-format it and send it directly to factoring so you get paid faster.
+                </p>
+            </div>
+
+            <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800 hover:border-green-500/30 transition group">
+                <div class="w-14 h-14 bg-slate-800 rounded-xl flex items-center justify-center mb-6 group-hover:bg-green-900/20 transition">
+                    <i class="fas fa-piggy-bank text-2xl text-green-400"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-3">The "Rebate" Savings</h3>
+                <p class="text-slate-400 leading-relaxed">
+                    Our 2% dispatch fee isn't gone forever. We convert it into <strong>$CANDLE</strong> tokens and lock it in a savings vault for you. It's a forced savings plan that grows with the fleet.
+                </p>
+            </div>
+        </div>
+    </div>
 </section>
+
+<section id="how-it-works" class="py-20 px-4 max-w-5xl mx-auto">
+    <div class="text-center mb-16">
+        <h2 class="text-3xl sm:text-4xl font-bold text-white mb-4">Your New Co-Pilot</h2>
+        <p class="text-slate-400">You focus on the road. We handle the noise.</p>
+    </div>
+
+    <div class="space-y-12 relative">
+        <div class="hidden md:block absolute left-1/2 top-0 bottom-0 w-0.5 bg-slate-800 -z-10"></div>
+
+        <div class="flex flex-col md:flex-row items-center gap-8">
+            <div class="flex-1 text-center md:text-right">
+                <h3 class="text-2xl font-bold text-green-400 mb-2">1. The Filter</h3>
+                <p class="text-slate-300">Our AI scans the major load boards every 30 seconds. It filters out the "cheap freight" and only pings you with loads that match your RPM and lane preferences.</p>
+            </div>
+            <div class="w-16 h-16 rounded-full bg-slate-800 border-4 border-slate-900 flex items-center justify-center z-10 font-bold text-white text-xl">1</div>
+            <div class="flex-1 hidden md:block"></div> </div>
+
+        <div class="flex flex-col md:flex-row items-center gap-8">
+            <div class="flex-1 hidden md:block"></div> <div class="w-16 h-16 rounded-full bg-slate-800 border-4 border-slate-900 flex items-center justify-center z-10 font-bold text-white text-xl">2</div>
+            <div class="flex-1 text-center md:text-left">
+                <h3 class="text-2xl font-bold text-green-400 mb-2">2. The Negotiation</h3>
+                <p class="text-slate-300">You tap "Accept." We instantly email the broker. If they offer $2,500, our AI counters with $2,800 based on current lane data. We win the negotiations you don't have time for.</p>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-center gap-8">
+            <div class="flex-1 text-center md:text-right">
+                <h3 class="text-2xl font-bold text-green-400 mb-2">3. The Vault</h3>
+                <p class="text-slate-300">Load delivered. We process the paperwork. The 2% fee is deducted, converted to crypto assets, and <strong>locked in your dashboard for 6 months</strong>. Watch your balance grow while you drive.</p>
+            </div>
+            <div class="w-16 h-16 rounded-full bg-slate-800 border-4 border-slate-900 flex items-center justify-center z-10 font-bold text-white text-xl">3</div>
+            <div class="flex-1 hidden md:block"></div> </div>
+    </div>
+</section>
+
+<section class="bg-gradient-to-r from-green-900 to-slate-900 py-16 px-4 text-center">
+    <div class="max-w-4xl mx-auto">
+        <h2 class="text-3xl font-bold text-white mb-6">Why lock the 2% fee?</h2>
+        <p class="text-green-100 text-lg mb-8 leading-relaxed">
+            Most dispatchers take their cut and disappear. We want long-term partners. <br>
+            By locking the fee into $CANDLE for 6 months, we create a <strong>Retirement/Savings Egg</strong> for you. 
+            If the network grows, your savings grow. We are in this together.
+        </p>
+        
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto text-center">
+            <div class="bg-black/30 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-white">2%</div>
+                <div class="text-xs text-green-300 uppercase">Flat Fee</div>
+            </div>
+            <div class="bg-black/30 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-white">6 Mo</div>
+                <div class="text-xs text-green-300 uppercase">Lock Period</div>
+            </div>
+            <div class="bg-black/30 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-white">24/7</div>
+                <div class="text-xs text-green-300 uppercase">Support</div>
+            </div>
+            <div class="bg-black/30 p-4 rounded-lg">
+                <div class="text-2xl font-bold text-white">100%</div>
+                <div class="text-xs text-green-300 uppercase">Transparent</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="text-center py-20 px-4">
+    <h2 class="text-3xl font-bold text-white mb-6">Ready to upgrade your dispatch?</h2>
+    <a href="/register" class="inline-block bg-green-500 hover:bg-green-400 text-slate-900 font-bold py-4 px-12 rounded-xl shadow-lg transition text-lg">
+        Join the Fleet
+    </a>
+    <p class="mt-4 text-slate-500 text-sm">No credit card required to sign up. Pay only when you get paid.</p>
+</div>
 
 {% endblock %}

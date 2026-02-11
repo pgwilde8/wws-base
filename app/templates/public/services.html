@@ -1,79 +1,141 @@
 {% extends "layout/base.html" %}
 
 {% block content %}
-<section class="max-w-6xl mx-auto px-4 py-16 space-y-12">
-	<header class="text-center space-y-3">
-		<p class="text-sm uppercase tracking-[0.3em] text-cyan-200">Services</p>
-		<h1 class="text-4xl sm:text-5xl font-extrabold text-white">What we ship for clients</h1>
-		<p class="text-lg text-gray-300 max-w-3xl mx-auto">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec id elit non mi porta gravida at eget metus.</p>
+<section class="max-w-6xl mx-auto px-4 py-16 space-y-14">
+	<header class="text-center space-y-4">
+		<p class="text-sm uppercase tracking-[0.3em] text-emerald-200">Services</p>
+		<h1 class="text-4xl sm:text-5xl font-extrabold text-white">The Full-Service Digital Cockpit</h1>
+		<p class="text-lg text-gray-300 max-w-3xl mx-auto">We've automated the back office so you can dominate the road. From the first scan to the final payout, we've got your six.</p>
 	</header>
 
-	<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
-			<h3 class="text-xl font-bold text-emerald-300 mb-2">FastAPI builds</h3>
-			<p class="text-gray-300">Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Integer posuere erat a ante venenatis dapibus posuere velit aliquet.</p>
-			<ul class="mt-4 space-y-2 text-sm text-gray-300">
-				<li class="flex gap-2"><span class="text-emerald-400">•</span> Auth flows and dashboards</li>
-				<li class="flex gap-2"><span class="text-emerald-400">•</span> API-first architecture</li>
-				<li class="flex gap-2"><span class="text-emerald-400">•</span> Observability baked in</li>
-			</ul>
-		</article>
+	<!-- 1. The AI Scout -->
+	<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-8 shadow-lg">
+		<div class="flex items-center gap-3 mb-4">
+			<span class="text-3xl">🔍</span>
+			<h2 class="text-2xl font-bold text-white">1. The AI Scout (Load Board Intelligence)</h2>
+		</div>
+		<p class="text-gray-300 mb-6">Most drivers waste hours refreshing boards. Our AI never sleeps.</p>
+		<ul class="space-y-3 text-gray-300">
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">Live Board Sync:</strong> We link directly to your DAT, Truckstop, and specialty board accounts.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">Smart Filtering:</strong> Tell the AI your "Must-Haves" (Min RPM, Max Weight, Home Time).</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">Active Surveillance:</strong> The moment a load hits that matches your criteria, the AI flags it.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">The "Window" Tech:</strong> Using our secure browser-sync technology, your AI agent acts as your digital eyes, ensuring you're always the first to see the money.</span>
+			</li>
+		</ul>
+	</section>
 
-		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
-			<h3 class="text-xl font-bold text-cyan-200 mb-2">AI integrations</h3>
-			<p class="text-gray-300">Aenean lacinia bibendum nulla sed consectetur. Sed posuere consectetur est at lobortis. Curabitur blandit tempus porttitor.</p>
-			<ul class="mt-4 space-y-2 text-sm text-gray-300">
-				<li class="flex gap-2"><span class="text-cyan-300">•</span> Chat and summarization flows</li>
-				<li class="flex gap-2"><span class="text-cyan-300">•</span> Retrieval and data guards</li>
-				<li class="flex gap-2"><span class="text-cyan-300">•</span> BYOK across providers</li>
-			</ul>
-		</article>
+	<!-- 2. The Auto-Negotiator -->
+	<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-8 shadow-lg">
+		<div class="flex items-center gap-3 mb-4">
+			<span class="text-3xl">✉️</span>
+			<h2 class="text-2xl font-bold text-white">2. The Auto-Negotiator (Email Agent)</h2>
+		</div>
+		<p class="text-gray-300 mb-6">Brokers move fast. If you aren't the first to email, you're the last to get the load.</p>
+		<ul class="space-y-3 text-gray-300">
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">Instant Outreach:</strong> The AI sends professional, pre-formatted bids to brokers the millisecond a load is identified.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">Rate Pushing:</strong> Our AI uses historical data to push for higher rates, detention pay, and layover protection.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">Paperwork Automation:</strong> We handle the "busy work"—sending carrier packets, insurance certs, and W-9s so you don't have to pull over to a truck stop to use a fax machine.</span>
+			</li>
+		</ul>
+	</section>
 
-		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
-			<h3 class="text-xl font-bold text-yellow-200 mb-2">Automations</h3>
-			<p class="text-gray-300">Etiam porta sem malesuada magna mollis euismod. Vivamus sagittis lacus vel augue laoreet rutrum faucibus dolor auctor.</p>
-			<ul class="mt-4 space-y-2 text-sm text-gray-300">
-				<li class="flex gap-2"><span class="text-yellow-200">•</span> Webhooks and jobs</li>
-				<li class="flex gap-2"><span class="text-yellow-200">•</span> Scheduling and retries</li>
-				<li class="flex gap-2"><span class="text-yellow-200">•</span> Monitoring hooks</li>
-			</ul>
-		</article>
+	<!-- 3. Factoring & Financial Flow -->
+	<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-8 shadow-lg">
+		<div class="flex items-center gap-3 mb-4">
+			<span class="text-3xl">💰</span>
+			<h2 class="text-2xl font-bold text-white">3. Factoring & Financial Flow</h2>
+		</div>
+		<p class="text-gray-300 mb-6">Cash flow is the lifeblood of an owner-operator. We've partnered with the best to keep your tanks full.</p>
+		<ul class="space-y-3 text-gray-300">
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">OTR Solutions Integration:</strong> Fully synced with OTR for same-day or next-day funding.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">One-Tap Invoicing:</strong> Upload your POD/BOL photos directly in the app. The AI generates the invoice and sends it to the factorer immediately.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">Transparent Accounting:</strong> See exactly what you earned, what OTR took for the cash, and what your 2% fee covers.</span>
+			</li>
+		</ul>
+	</section>
 
-		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
-			<h3 class="text-xl font-bold text-pink-200 mb-2">Data & storage</h3>
-			<p class="text-gray-300">Nullam id dolor id nibh ultricies vehicula ut id elit. Maecenas faucibus mollis interdum.</p>
-			<ul class="mt-4 space-y-2 text-sm text-gray-300">
-				<li class="flex gap-2"><span class="text-pink-200">•</span> Postgres per tenant</li>
-				<li class="flex gap-2"><span class="text-pink-200">•</span> Migrations ready</li>
-				<li class="flex gap-2"><span class="text-pink-200">•</span> Object storage hooks</li>
-			</ul>
-		</article>
+	<!-- 4. The $CANDLE Rewards Program -->
+	<section class="bg-gradient-to-br from-emerald-900/30 to-gray-900/60 border-2 border-emerald-500/40 rounded-2xl p-8 shadow-lg">
+		<div class="flex items-center gap-3 mb-4">
+			<span class="text-3xl">🕯️</span>
+			<h2 class="text-2xl font-bold text-white">4. The $CANDLE Rewards Program (Your "Stash")</h2>
+		</div>
+		<p class="text-gray-300 mb-6">We don't just take a fee; we help you build an asset.</p>
+		<ul class="space-y-3 text-gray-300">
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-emerald-300">The 75/25 Rebate:</strong> 75% of your 2% network fee is rebated back to you in $CANDLE tokens.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-emerald-300">Deflationary Burn:</strong> 25% of the fee is burned, removing it from supply to support the token's value.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-emerald-300">The Vault:</strong> Track your growing "Maintenance Fund" in real-time on your driver dashboard.</span>
+			</li>
+		</ul>
+	</section>
 
-		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
-			<h3 class="text-xl font-bold text-indigo-200 mb-2">Deployment</h3>
-			<p class="text-gray-300">Cras mattis consectetur purus sit amet fermentum. Aenean eu leo quam. Pellentesque ornare sem lacinia quam venenatis vestibulum.</p>
-			<ul class="mt-4 space-y-2 text-sm text-gray-300">
-				<li class="flex gap-2"><span class="text-indigo-200">•</span> Dockerized per client</li>
-				<li class="flex gap-2"><span class="text-indigo-200">•</span> UFW and Fail2Ban aware</li>
-				<li class="flex gap-2"><span class="text-indigo-200">•</span> External port mapping</li>
-			</ul>
-		</article>
+	<!-- 5. The UPay Debit Card -->
+	<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-8 shadow-lg">
+		<div class="flex items-center gap-3 mb-4">
+			<span class="text-3xl">💳</span>
+			<h2 class="text-2xl font-bold text-white">5. The UPay Debit Card (The Off-Ramp)</h2>
+		</div>
+		<p class="text-gray-300 mb-6">The ultimate goal: Spendable cash without the "Crypto" headache.</p>
+		<ul class="space-y-3 text-gray-300">
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">6-Month Unlock:</strong> Your rewards vest for 180 days to ensure network stability.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">Direct-to-Card:</strong> Once unlocked, move your $CANDLE to your <strong class="text-emerald-300">Green Candle Debit Card</strong> (powered by UPay).</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">Spend Anywhere:</strong> Use it at any truck stop, grocery store, or repair shop that accepts Visa/Mastercard.</span>
+			</li>
+			<li class="flex items-start gap-3">
+				<span class="text-emerald-400 font-bold shrink-0">→</span>
+				<span><strong class="text-white">Virtual & Physical:</strong> Get a virtual card for your phone immediately, and a high-status physical card for your wallet.</span>
+			</li>
+		</ul>
+	</section>
 
-		<article class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
-			<h3 class="text-xl font-bold text-orange-200 mb-2">Support</h3>
-			<p class="text-gray-300">Morbi leo risus, porta ac consectetur ac, vestibulum at eros. Integer posuere erat a ante venenatis dapibus posuere velit aliquet.</p>
-			<ul class="mt-4 space-y-2 text-sm text-gray-300">
-				<li class="flex gap-2"><span class="text-orange-200">•</span> Playbooks and runbooks</li>
-				<li class="flex gap-2"><span class="text-orange-200">•</span> Logging and alerts</li>
-				<li class="flex gap-2"><span class="text-orange-200">•</span> Handoff documentation</li>
-			</ul>
-		</article>
-	</div>
-
-	<div class="bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 border border-cyan-700/40 rounded-2xl p-8 text-center space-y-3">
-		<h3 class="text-2xl font-bold text-white">Need something custom?</h3>
-		<p class="text-gray-200">Vestibulum id ligula porta felis euismod semper. Nulla vitae elit libero, a pharetra augue.</p>
-		<a href="/contact" class="inline-block bg-cyan-500 hover:bg-cyan-600 text-white font-semibold px-6 py-3 rounded-xl transition">Talk to us</a>
+	<!-- CTA -->
+	<div class="bg-gradient-to-r from-emerald-500/20 to-cyan-500/10 border border-emerald-700/40 rounded-2xl p-8 text-center space-y-4">
+		<h3 class="text-2xl font-bold text-white">Ready to Run the Digital Cockpit?</h3>
+		<p class="text-gray-200">From Scout to stash to card—one platform. No fluff. Just the services that matter to your bottom line.</p>
+		<a href="/register-trucker" class="inline-block bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-8 py-4 rounded-xl transition shadow-lg">Join the Fleet</a>
 	</div>
 </section>
 {% endblock %}

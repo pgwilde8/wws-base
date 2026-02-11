@@ -21,9 +21,9 @@ if not os.getenv("DATABASE_URL"):
                 os.environ["DATABASE_URL"] = line.split("=", 1)[1].strip().strip('"').strip("'")
                 break
 
-from app.routes import public_router, auth_router, admin_router, client_router, legal_router
+from app.routes import public_router, auth_router, admin_router, client_router, legal_router, ingest_router
 
-app = FastAPI(title="WebWise Solutions Base Template")
+app = FastAPI(title="Green Candle Dispatch")
 
 _BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(_BASE_DIR / "static")), name="static")
@@ -33,6 +33,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(client_router)
 app.include_router(legal_router)
+app.include_router(ingest_router)  # Chrome Extension ingestion endpoint
 
 PORT = int(os.getenv("PORT", "8990"))
 

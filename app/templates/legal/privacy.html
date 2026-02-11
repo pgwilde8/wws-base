@@ -1,0 +1,86 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<section class="max-w-4xl mx-auto px-4 py-16 space-y-8">
+	<header class="space-y-3 text-center">
+		<p class="text-sm uppercase tracking-[0.3em] text-emerald-200">Legal</p>
+		<h1 class="text-4xl sm:text-5xl font-extrabold text-white">Privacy Policy</h1>
+		<p class="text-lg text-gray-300">Last updated: February 9, 2026</p>
+	</header>
+
+
+
+	<article class="space-y-6 text-gray-200">
+		<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow">
+			<h3 class="text-xl font-bold text-white mb-4">1. Information we collect</h3>
+			<p class="text-gray-300 mb-3">We collect information you give us when you sign up and use the service:</p>
+			<ul class="list-disc list-inside text-gray-300 space-y-2 ml-4">
+				<li><strong class="text-white">Account data:</strong> Email, password (hashed), display name, carrier name, MC number</li>
+				<li><strong class="text-white">Load and dispatch data:</strong> Load board IDs, rates, origin/destination, broker names, BOL uploads and related documents</li>
+				<li><strong class="text-white">Factoring and payments:</strong> Information needed to process settlements and the 2% network fee (e.g. factored settlement amounts)</li>
+				<li><strong class="text-white">Rewards:</strong> $CANDLE reward balances and vesting data tied to your account</li>
+				<li><strong class="text-white">Usage and support:</strong> Logs of how you use the service, support messages, and device/browser info when necessary for troubleshooting</li>
+			</ul>
+		</section>
+
+		<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow">
+			<h3 class="text-xl font-bold text-white mb-4">2. How we use your data</h3>
+			<p class="text-gray-300 mb-3">We use your information to:</p>
+			<ul class="list-disc list-inside text-gray-300 space-y-2 ml-4">
+				<li>Provide and operate the AI dispatch service, load tracking, and paperwork tools</li>
+				<li>Calculate and apply the 2% network fee and credit $CANDLE rewards to your account</li>
+				<li>Coordinate with factoring partners (e.g. OTR Solutions) so settlements and fee deductions are processed correctly</li>
+				<li>Authenticate you and enforce our Terms of Service</li>
+				<li>Send service-related messages (e.g. load updates, account or security notices)</li>
+				<li>Improve the product, fix bugs, and protect against fraud and abuse</li>
+			</ul>
+			<p class="text-gray-300 mt-4">We do not sell your personal information. We do not use your data for advertising or to build profiles for third-party marketing.</p>
+		</section>
+
+		<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow">
+			<h3 class="text-xl font-bold text-white mb-4">3. Sharing with third parties</h3>
+			<p class="text-gray-300 mb-3">We may share your information only when necessary, and only as follows:</p>
+			<ul class="list-disc list-inside text-gray-300 space-y-2 ml-4">
+				<li><strong class="text-white">Factoring and payments:</strong> With your factoring partner (e.g. OTR Solutions) so they can pay you and deduct our network fee as you have authorized.</li>
+				<li><strong class="text-white">Load boards and brokers:</strong> Data needed for the AI to search and negotiate (e.g. lane, equipment, rate) may be used in communications with load boards and brokers as part of the service.</li>
+				<li><strong class="text-white">Rewards and redemption:</strong> If you redeem $CANDLE through a third party (e.g. UPay), we may share only what’s needed for that redemption, per their and our terms.</li>
+				<li><strong class="text-white">Legal and safety:</strong> When required by law, court order, or to protect rights, safety, or security.</li>
+			</ul>
+		</section>
+
+		<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow">
+			<h3 class="text-xl font-bold text-white mb-4">4. Retention and security</h3>
+			<p class="text-gray-300 mb-3">We keep your data for as long as your account is active and as needed to provide the service, comply with law, and resolve disputes. After account closure, we may retain certain data for legal, tax, or safety reasons for a limited period.</p>
+			<p class="text-gray-300">We use reasonable technical and organizational measures to protect your data (e.g. encryption, access controls, secure hosting). No system is 100% secure; we expect you to keep your password and account details safe.</p>
+		</section>
+
+		<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow">
+			<h3 class="text-xl font-bold text-white mb-4">5. Your choices and rights</h3>
+			<p class="text-gray-300 mb-3">You can:</p>
+			<ul class="list-disc list-inside text-gray-300 space-y-2 ml-4">
+				<li>Update your account and profile information in your dashboard</li>
+				<li>Request access to or correction of your personal data by contacting us at the email below</li>
+				<li>Request deletion of your account and associated data, subject to our need to retain certain information for legal or operational reasons</li>
+				<li>Opt out of non-essential emails (service-related messages may still be sent)</li>
+			</ul>
+			<p class="text-gray-300 mt-4">If you are in a jurisdiction that grants additional rights (e.g. GDPR, CCPA), we will honor them to the extent required by law. Contact us to exercise those rights.</p>
+		</section>
+
+		<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow">
+			<h3 class="text-xl font-bold text-white mb-4">6. Cookies and similar tech</h3>
+			<p class="text-gray-300">We use session cookies and similar technology to keep you logged in and to run the service. We do not use third-party advertising cookies. You can adjust your browser settings to limit or block cookies; some features may not work if you disable them.</p>
+		</section>
+
+		<section class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow">
+			<h3 class="text-xl font-bold text-white mb-4">7. Changes and contact</h3>
+			<p class="text-gray-300 mb-4">We may update this privacy policy from time to time. The “Last updated” date at the top will change when we do. Continued use of the service after changes means you accept the updated policy.</p>
+			<p class="text-gray-300"><strong class="text-white">Questions or requests?</strong> Contact us at:</p>
+			<div class="mt-3 text-gray-300">
+				<p><strong class="text-emerald-300">Green Candle Dispatch LLC</strong></p>
+				<p>304 S. Jones Blvd #801, Las Vegas, NV 89107</p>
+				<p>Email: <a href="mailto:support@greencandledispatch.com" class="text-emerald-400 hover:underline">support@greencandledispatch.com</a></p>
+			</div>
+		</section>
+	</article>
+</section>
+{% endblock %}

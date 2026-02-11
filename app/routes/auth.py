@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Request, Form, status, HTTPException
+from fastapi import APIRouter, Request, Form, Depends, status, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core.deps import (
     templates,
     engine,
+    get_db,
     get_user_by_email,
     hash_password,
     verify_password,
@@ -12,6 +14,7 @@ from app.core.deps import (
     SESSION_COOKIE,
     SESSION_TTL_SECONDS,
 )
+from app.models.user import User
 
 router = APIRouter()
 
@@ -20,10 +23,10 @@ router = APIRouter()
 def login_choice(request: Request):
     return templates.TemplateResponse("auth/login-choice.html", {"request": request})
 
-
-@router.get("/login/admin")
+@router.get("/admin/login")
 def admin_login_page(request: Request):
-    return templates.TemplateResponse("auth/admin-login.html", {"request": request})
+    """Admin login page - accessible at both /login/admin and /admin/login"""
+    return templates.TemplateResponse("admin/login.html", {"request": request})
 
 
 @router.post("/auth/admin")
@@ -94,8 +97,15 @@ def register_trucker(
     mc_number: str = Form(...),
     carrier_name: str = Form(...),
     truck_identifier: str = Form(""),
+    # NEW FORM INPUTS FOR FACTORING:
+    has_factoring: str = Form("no"),  # "yes" or "no" (default to "no")
+    factoring_company_name: str = Form(None),  # If yes, the company name
+    interested_in_otr: str = Form(None),  # If no, checkbox value (e.g., "on" or None)
 ):
-    """Create user (role=client) and TruckerProfile in one step. MC Number = industry ID."""
+    """
+    Create user (role=client) and TruckerProfile in one step. MC Number = industry ID.
+    Now includes factoring company and referral status tracking.
+    """
     if get_user_by_email(email):
         return templates.TemplateResponse(
             "auth/register-trucker.html",
@@ -103,25 +113,74 @@ def register_trucker(
         )
     if not engine:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database not configured")
+    
     try:
         password_hash = hash_password(password)
     except Exception:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not hash password")
+    
+    # 1. Determine the Referral Status and Factoring Company
+    referral_status = "NONE"
+    factoring_co = None
+
+    if has_factoring == "yes" and factoring_company_name:
+        factoring_co = factoring_company_name.strip()
+        referral_status = "EXISTING_CLIENT"
+    elif interested_in_otr:  # Checkbox was checked (value is "on" or similar)
+        referral_status = "OTR_REQUESTED"
+        # 💰 ALERT: This is your Money Trigger!
+        # TODO: Later, add email automation here to send them the OTR link.
+        # Example: send_otr_referral_email(email, mc_number)
+    
     with engine.begin() as conn:
+        # Insert user with factoring fields
         r = conn.execute(
             text("""
-                INSERT INTO webwise.users (email, password_hash, role, is_active)
-                VALUES (:email, :password_hash, 'client', true)
+                INSERT INTO webwise.users (
+                    email, 
+                    password_hash, 
+                    role, 
+                    is_active,
+                    factoring_company,
+                    referral_status
+                )
+                VALUES (
+                    :email, 
+                    :password_hash, 
+                    'client', 
+                    true,
+                    :factoring_company,
+                    :referral_status
+                )
                 RETURNING id
             """),
-            {"email": email.strip().lower(), "password_hash": password_hash},
+            {
+                "email": email.strip().lower(),
+                "password_hash": password_hash,
+                "factoring_company": factoring_co,
+                "referral_status": referral_status
+            },
         )
         row = r.one()
         user_id = row.id
+        
+        # Insert trucker profile
         conn.execute(
             text("""
-                INSERT INTO webwise.trucker_profiles (user_id, display_name, mc_number, carrier_name, truck_identifier)
-                VALUES (:user_id, :display_name, :mc_number, :carrier_name, :truck_identifier)
+                INSERT INTO webwise.trucker_profiles (
+                    user_id, 
+                    display_name, 
+                    mc_number, 
+                    carrier_name, 
+                    truck_identifier
+                )
+                VALUES (
+                    :user_id, 
+                    :display_name, 
+                    :mc_number, 
+                    :carrier_name, 
+                    :truck_identifier
+                )
             """),
             {
                 "user_id": user_id,
@@ -131,9 +190,52 @@ def register_trucker(
                 "truck_identifier": (truck_identifier or "").strip() or None,
             },
         )
+    
+    # Log referral status for admin tracking
+    if referral_status == "OTR_REQUESTED":
+        print(f"💰 REFERRAL ALERT: {email} ({mc_number}) requested OTR referral!")
+    
+    # Send welcome email to new beta driver (non-blocking)
+    try:
+        from app.services.welcome_email import send_welcome_email_to_driver
+        # Send in background thread (don't block registration)
+        import threading
+        threading.Thread(
+            target=send_welcome_email_to_driver,
+            args=(email.strip().lower(), display_name.strip()),
+            daemon=True
+        ).start()
+    except Exception as e:
+        print(f"⚠️  Welcome email failed (non-blocking): {e}")
+    
     session_token = sign_session({"uid": user_id, "role": "client", "email": email.strip().lower()})
     response = RedirectResponse(url="/clients/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         SESSION_COOKIE, session_token, httponly=True, secure=False, samesite="lax", max_age=SESSION_TTL_SECONDS
     )
     return response
+
+@router.get("/register")
+async def register_page(request: Request, ref: str = None):
+    # Pass the ref code to the template so it can be included in the form hidden field
+    return templates.TemplateResponse("auth/register.html", {"request": request, "ref_code": ref})
+
+@router.post("/register")
+async def register(
+    # ... existing fields ...
+    ref_code: str = Form(None), # <--- Capture this
+    db: Session = Depends(get_db)
+):
+    # 1. Find who referred them
+    referrer_id = None
+    if ref_code:
+        referrer = db.query(User).filter(User.referral_code == ref_code).first()
+        if referrer:
+            referrer_id = referrer.referral_code # Store the CODE, not the ID, for easier lookup
+
+    # 2. Create User with 'referred_by'
+    new_user = User(
+        # ... existing fields ...
+        referred_by=referrer_id
+    )
+    # ... save to DB ...    

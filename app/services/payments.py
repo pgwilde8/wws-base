@@ -92,3 +92,48 @@ class RevenueService:
                 }
         except Exception:
             return {"win_count": 0, "total_revenue": 0.0, "candle_contribution_usd": 0.0}
+
+    @staticmethod
+    def get_all_trucker_contributions(engine: Optional[Engine], limit: int = 10) -> list[dict[str, Any]]:
+        """
+        Get contribution stats for all truckers (leaderboard-style).
+        Returns list sorted by total revenue descending.
+        """
+        if not engine:
+            return []
+        try:
+            with engine.begin() as conn:
+                r = conn.execute(
+                    text("""
+                        SELECT
+                            tp.id,
+                            tp.display_name,
+                            tp.mc_number,
+                            tp.carrier_name,
+                            COUNT(n.id) AS win_count,
+                            COALESCE(SUM(n.final_rate), 0) AS total_revenue,
+                            COALESCE(SUM(n.final_rate), 0) * 0.02 AS candle_contribution_usd
+                        FROM webwise.trucker_profiles tp
+                        LEFT JOIN webwise.negotiations n ON n.trucker_id = tp.id AND n.status = 'won'
+                        GROUP BY tp.id, tp.display_name, tp.mc_number, tp.carrier_name
+                        HAVING COUNT(n.id) > 0
+                        ORDER BY total_revenue DESC
+                        LIMIT :limit
+                    """),
+                    {"limit": limit},
+                )
+                results = []
+                for row in r:
+                    results.append({
+                        "trucker_id": row.id,
+                        "display_name": row.display_name,
+                        "mc_number": row.mc_number or "N/A",
+                        "carrier_name": row.carrier_name,
+                        "win_count": row.win_count or 0,
+                        "total_revenue": float(row.total_revenue or 0),
+                        "candle_contribution_usd": round(float(row.candle_contribution_usd or 0), 2),
+                    })
+                return results
+        except Exception as e:
+            print(f"Error getting trucker contributions: {e}")
+            return []

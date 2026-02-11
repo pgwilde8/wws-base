@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin Dashboard{% endblock %} | Green Candle Dispatch</title>
+</head>
+<body class="bg-black text-white min-h-screen">
+  <!-- Minimal Admin Header (no public navbar/footer) -->
+  <div class="bg-slate-900 border-b border-slate-700 px-6 py-3">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-6">
+        <a href="/admin/dashboard" class="text-xl font-bold text-green-400">Green Candle Admin</a>
+        <nav class="flex gap-4 text-sm">
+          <a href="/admin/dashboard" class="text-slate-300 hover:text-white transition">Dashboard</a>
+          <a href="/admin/leads" class="text-slate-300 hover:text-white transition">Leads</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-4">
+        <a href="/logout" class="text-sm text-slate-400 hover:text-white transition">Logout</a>
+      </div>
+    </div>
+  </div>
+  
+  {% block content %}{% endblock %}
+</body>
+</html>

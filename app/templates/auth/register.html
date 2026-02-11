@@ -1,0 +1,121 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+
+<div class="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        <h2 class="text-3xl font-black text-white tracking-tight">
+            Join the Fleet
+        </h2>
+        <p class="mt-2 text-sm text-slate-400">
+            Start your 7-day free trial. Cancel anytime.
+        </p>
+    </div>
+
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="bg-slate-800 py-8 px-4 shadow-xl sm:rounded-lg sm:px-10 border border-slate-700">
+            <form class="space-y-6" action="/register" method="POST">
+                
+                <div>
+                    <label for="email" class="block text-sm font-medium text-slate-300">Email address</label>
+                    <div class="mt-1">
+                        <input id="email" name="email" type="email" autocomplete="email" required 
+                            class="appearance-none block w-full px-3 py-2 border border-slate-600 rounded-md shadow-sm placeholder-slate-500 focus:outline-none focus:ring-green-500 focus:border-green-500 bg-slate-900 text-white sm:text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-slate-300">Password</label>
+                    <div class="mt-1">
+                        <input id="password" name="password" type="password" autocomplete="current-password" required 
+                            class="appearance-none block w-full px-3 py-2 border border-slate-600 rounded-md shadow-sm placeholder-slate-500 focus:outline-none focus:ring-green-500 focus:border-green-500 bg-slate-900 text-white sm:text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="mc_number" class="block text-sm font-medium text-slate-300">MC Number</label>
+                    <div class="mt-1">
+                        <input id="mc_number" name="mc_number" type="text" required 
+                            class="appearance-none block w-full px-3 py-2 border border-slate-600 rounded-md shadow-sm placeholder-slate-500 focus:outline-none focus:ring-green-500 focus:border-green-500 bg-slate-900 text-white sm:text-sm">
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-700">
+                    <label class="block text-sm font-bold text-white mb-3">Do you have a Factoring Company?</label>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="has_factoring" value="yes" class="peer sr-only" onchange="toggleFactoring(this.value)">
+                            <div class="rounded-md border border-slate-600 bg-slate-900 p-3 text-center transition hover:border-slate-500 peer-checked:border-green-500 peer-checked:bg-green-900/20">
+                                <span class="text-sm font-medium text-slate-300 peer-checked:text-green-400">Yes, I have one</span>
+                            </div>
+                        </label>
+                        
+                        <label class="cursor-pointer">
+                            <input type="radio" name="has_factoring" value="no" class="peer sr-only" onchange="toggleFactoring(this.value)">
+                            <div class="rounded-md border border-slate-600 bg-slate-900 p-3 text-center transition hover:border-slate-500 peer-checked:border-green-500 peer-checked:bg-green-900/20">
+                                <span class="text-sm font-medium text-slate-300 peer-checked:text-green-400">No, I need one</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div id="factoring-input-section" class="mt-4 hidden">
+                        <label for="factoring_company_name" class="block text-xs font-medium text-slate-400">Who is your current provider?</label>
+                        <input type="text" name="factoring_company_name" placeholder="e.g. RTS, TAFS, Apex"
+                            class="mt-1 block w-full px-3 py-2 border border-slate-600 rounded-md bg-slate-900 text-white text-sm focus:ring-green-500 focus:border-green-500">
+                    </div>
+
+                    <div id="otr-promo-section" class="mt-4 hidden">
+                        <div class="rounded-md bg-green-900/30 border border-green-500/50 p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-handshake text-green-400"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <h3 class="text-sm font-bold text-green-300">Recommended: OTR Solutions</h3>
+                                    <div class="mt-2 text-xs text-green-200">
+                                        <p>Green Candle partners with OTR for instant funding and lower rates.</p>
+                                        <ul class="list-disc pl-4 mt-1 space-y-1 text-green-200/80">
+                                            <li>Same-day pay</li>
+                                            <li>No long-term contracts</li>
+                                            <li>Integrated with our Dispatch App</li>
+                                        </ul>
+                                    </div>
+                                    <div class="mt-3">
+                                        <label class="flex items-center space-x-2">
+                                            <input type="checkbox" name="interested_in_otr" checked class="rounded border-green-600 text-green-500 focus:ring-green-500 bg-slate-900">
+                                            <span class="text-xs text-white">Yes, send me an OTR application link</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4">
+                    <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-bold text-slate-900 bg-green-500 hover:bg-green-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-slate-900 transition">
+                        Create Account
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleFactoring(value) {
+        const inputSection = document.getElementById('factoring-input-section');
+        const promoSection = document.getElementById('otr-promo-section');
+        
+        if (value === 'yes') {
+            inputSection.classList.remove('hidden');
+            promoSection.classList.add('hidden');
+        } else {
+            inputSection.classList.add('hidden');
+            promoSection.classList.remove('hidden');
+        }
+    }
+</script>
+
+{% endblock %}

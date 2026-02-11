@@ -1,7 +1,23 @@
 # Notification sounds
 
-Add a short audio file here so drivers hear a ping when a new notification arrives (e.g. Load Won).
+Add audio files here so drivers hear sounds when notifications arrive.
 
-- **File name:** `ping.mp3`
-- **Suggested:** 0.5–1.5 seconds; cash-register, sonar ping, or subtle chime.
-- Browsers may block autoplay until the user has interacted with the page (e.g. tapped once).
+## LOAD_WON Notification Sound
+
+- **File name:** `cash-register-purchase.wav`
+- **Purpose:** Cash register "cha-ching" sound for LOAD_WON notifications
+- **Why:** Creates a Pavlovian response - driver hears "cha-ching" = money made, vault grew
+- **Specs:** 
+  - Duration: 0.5–1.5 seconds
+  - Volume: 60% (audible but not jarring)
+  - Format: WAV (MP3 also supported)
+  - Current file: `cash-register-purchase.wav` ✅
+
+## Browser Autoplay Handling
+
+Browsers (especially Mobile Safari/Chrome) block autoplay until user interaction.
+The dashboard includes an audio unlock mechanism:
+- First tap/click anywhere unlocks audio context
+- Audio plays silently at volume 0, then pauses
+- This "unlocks" the audio for the rest of the session
+- Subsequent notifications will play the "cha-ching" sound automatically

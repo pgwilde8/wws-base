@@ -75,6 +75,30 @@ def run_bootstrap():
                 updated_at TIMESTAMP
             );
         """))
+        # Add token usage tracking columns if they don't exist
+        conn.execute(text("""
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'negotiations' 
+                               AND column_name = 'ai_prompt_tokens') THEN
+                    ALTER TABLE webwise.negotiations ADD COLUMN ai_prompt_tokens INTEGER DEFAULT 0;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'negotiations' 
+                               AND column_name = 'ai_completion_tokens') THEN
+                    ALTER TABLE webwise.negotiations ADD COLUMN ai_completion_tokens INTEGER DEFAULT 0;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'negotiations' 
+                               AND column_name = 'ai_total_tokens') THEN
+                    ALTER TABLE webwise.negotiations ADD COLUMN ai_total_tokens INTEGER DEFAULT 0;
+                END IF;
+            END $$;
+        """))
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS webwise.users (
                 id SERIAL PRIMARY KEY,
@@ -83,8 +107,35 @@ def run_bootstrap():
                 role VARCHAR(20) NOT NULL DEFAULT 'admin',
                 is_active BOOLEAN DEFAULT true,
                 created_at TIMESTAMP DEFAULT now(),
-                last_login TIMESTAMP
+                last_login TIMESTAMP,
+                factoring_company VARCHAR(255),
+                referral_status VARCHAR(50) DEFAULT 'NONE'
             );
+        """))
+        # Add columns if they don't exist (for existing databases)
+        conn.execute(text("""
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'users' 
+                               AND column_name = 'factoring_company') THEN
+                    ALTER TABLE webwise.users ADD COLUMN factoring_company VARCHAR(255);
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'users' 
+                               AND column_name = 'referral_status') THEN
+                    ALTER TABLE webwise.users ADD COLUMN referral_status VARCHAR(50) DEFAULT 'NONE';
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'users' 
+                               AND column_name = 'location_code') THEN
+                    ALTER TABLE webwise.users ADD COLUMN location_code VARCHAR(50);
+                    CREATE INDEX IF NOT EXISTS idx_users_location_code ON webwise.users(location_code);
+                END IF;
+            END $$;
         """))
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS webwise.trucker_profiles (
@@ -114,6 +165,25 @@ def run_bootstrap():
                 is_read BOOLEAN NOT NULL DEFAULT false,
                 created_at TIMESTAMP DEFAULT now()
             );
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.loads (
+                id SERIAL PRIMARY KEY,
+                ref_id VARCHAR(200) UNIQUE NOT NULL,
+                origin VARCHAR(200),
+                destination VARCHAR(200),
+                price VARCHAR(50),
+                equipment_type VARCHAR(50),
+                pickup_date VARCHAR(100),
+                status VARCHAR(50) DEFAULT 'NEW',
+                raw_data JSONB,
+                created_at TIMESTAMP DEFAULT now(),
+                updated_at TIMESTAMP
+            );
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_loads_ref_id ON webwise.loads(ref_id);
+            CREATE INDEX IF NOT EXISTS idx_loads_status ON webwise.loads(status);
         """))
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS webwise.driver_savings_ledger (

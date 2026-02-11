@@ -9,6 +9,25 @@ from app.core.deps import templates, current_user, engine
 router = APIRouter()
 
 
+@router.get("/legal/terms-of-service", response_class=HTMLResponse)
+@router.get("/legal/tos", response_class=HTMLResponse)
+def terms_of_service_page(request: Request):
+    """
+    Public Terms of Service page.
+    Accessible to all users without authentication.
+    """
+    return templates.TemplateResponse("legal/tos.html", {"request": request})
+
+
+@router.get("/legal/privacy", response_class=HTMLResponse)
+def privacy_policy_page(request: Request):
+    """
+    Public Privacy Policy page.
+    Accessible to all users without authentication.
+    """
+    return templates.TemplateResponse("legal/privacy.html", {"request": request})
+
+
 @router.get("/legal/notice-of-assignment", response_class=HTMLResponse)
 def notice_of_assignment_page(
     request: Request,

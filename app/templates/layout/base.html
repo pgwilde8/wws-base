@@ -1,9 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Green Candle Dispatch{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 </head>
-<body class="bg-black text-white">
+<body class="bg-black text-white font-sans">
   {% include "layout/navbar.html" %}
   {% block content %}{% endblock %}
   {% include "layout/footer.html" %}

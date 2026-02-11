@@ -5,11 +5,12 @@ import enum
 from .bootstrap_db import Base # Adjust based on your actual Base location
 
 class NegotiationStatus(enum.Enum):
-    PENDING = "pending"     # AI drafted, waiting for driver or broker
-    SENT = "sent"           # Email/SMS actually sent to broker
-    REPLIED = "replied"     # Broker responded
-    WON = "won"             # Rate agreed, load booked
-    LOST = "lost"           # Broker gave it to someone else or rejected price
+    PENDING = "pending"           # AI drafted, waiting for driver or broker
+    SENT = "sent"                 # Email/SMS actually sent to broker
+    REPLIED = "replied"           # Broker responded (generic response)
+    PENDING_APPROVAL = "pending_approval"  # Broker said yes - driver needs to confirm
+    WON = "won"                   # Rate agreed, load booked (driver confirmed)
+    LOST = "lost"                 # Broker gave it to someone else or rejected price
 
 class Negotiation(Base):
     __tablename__ = "negotiations"

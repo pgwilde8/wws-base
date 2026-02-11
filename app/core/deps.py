@@ -10,6 +10,7 @@ from typing import Optional, Dict
 from typing import Generator
 
 from fastapi import Request, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -110,10 +111,14 @@ def current_user(request: Request) -> Optional[Dict]:
 
 
 def require_admin(user: Optional[Dict] = Depends(current_user)) -> Dict:
+    """
+    Require admin authentication. Raises HTTPException if not authenticated or not admin.
+    For HTML routes, check authentication manually and redirect to /admin/login.
+    """
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     if user.get("role") != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
 
 

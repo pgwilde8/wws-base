@@ -1,11 +1,11 @@
-{% extends "layout/base.html" %}
+{% extends "layout/admin_base.html" %}
 {% block content %}
 <script src="https://unpkg.com/htmx.org@1.9.10" crossorigin="anonymous"></script>
 <section class="max-w-6xl mx-auto px-4 py-10 space-y-8">
   <header class="flex flex-col gap-2">
     <p class="text-sm uppercase tracking-[0.3em] text-emerald-300">Admin</p>
     <h1 class="text-3xl sm:text-4xl font-extrabold text-white">Dashboard</h1>
-    <p class="text-gray-300">Monitor projects, incoming testimonials, and system status.</p>
+    <p class="text-gray-300">Monitor Green Candle Dispatch operations, negotiations, and referral income.</p>
   </header>
 
   <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -110,8 +110,20 @@
     </div>
 
     <aside class="space-y-4">
+      <div hx-get="/admin/network-health" hx-trigger="load" hx-swap="innerHTML" class="min-h-[120px] flex items-center justify-center">
+        <span class="text-gray-500 text-sm">Loading…</span>
+      </div>
       <div hx-get="/admin/revenue-stats" hx-trigger="load" hx-swap="innerHTML" class="min-h-[120px] flex items-center justify-center">
         <span class="text-gray-500 text-sm">Loading…</span>
+      </div>
+      <div hx-get="/admin/referral-stats" hx-trigger="load" hx-swap="innerHTML" class="min-h-[300px] flex items-center justify-center">
+        <span class="text-gray-500 text-sm">Loading referral stats…</span>
+      </div>
+      <div hx-get="/admin/usage-stats" hx-trigger="load" hx-swap="innerHTML" class="min-h-[200px] flex items-center justify-center">
+        <span class="text-gray-500 text-sm">Loading usage stats…</span>
+      </div>
+      <div hx-get="/admin/trucker-leaderboard" hx-trigger="load" hx-swap="innerHTML" class="min-h-[300px] flex items-center justify-center">
+        <span class="text-gray-500 text-sm">Loading leaderboard…</span>
       </div>
       <div class="bg-gray-900/60 border border-white/10 rounded-2xl p-6">
         <h3 class="text-lg font-bold text-white mb-3">System status</h3>

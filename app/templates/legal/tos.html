@@ -1,0 +1,148 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<section class="max-w-4xl mx-auto px-4 py-16 space-y-8">
+    <header class="space-y-3 text-center">
+        <p class="text-sm uppercase tracking-[0.3em] text-green-400 font-bold">Legal</p>
+        <h1 class="text-4xl sm:text-5xl font-black text-white">Terms of Service</h1>
+        <p class="text-lg text-slate-400">Last updated: February 10, 2026</p>
+        <p class="text-sm text-slate-500">By using Green Candle Dispatch, you agree to these terms.</p>
+    </header>
+
+    <div class="bg-yellow-900/20 border border-yellow-600/50 rounded-2xl p-6 mb-8 flex gap-4">
+        <div class="shrink-0 text-yellow-500">
+            <i class="fas fa-exclamation-triangle text-xl"></i>
+        </div>
+        <div>
+            <h3 class="text-lg font-bold text-yellow-400 mb-1">Important Legal Notice</h3>
+            <p class="text-slate-300 text-sm leading-relaxed">
+                These terms include a <strong>binding arbitration agreement</strong>, a <strong>class action waiver</strong>, and important details about the <strong>forfeiture of unvested rewards</strong> upon cancellation.
+            </p>
+        </div>
+    </div>
+
+    <article class="space-y-8 text-slate-300">
+        
+        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-lg">
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center">
+                <span class="bg-slate-800 text-slate-500 text-sm px-2 py-1 rounded mr-3 border border-slate-700">1</span> 
+                Acceptance of Terms
+            </h3>
+            <p class="mb-3">Green Candle Dispatch LLC ("we," "us," or "our") provides AI-powered dispatch and logistics management software (the "Service"). By accessing or using our Service, you ("User," "Driver," "Carrier," or "you") agree to be bound by these Terms of Service.</p>
+            <p>If you do not agree to these Terms, you may not use the Service.</p>
+        </section>
+
+        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-lg">
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center">
+                <span class="bg-slate-800 text-slate-500 text-sm px-2 py-1 rounded mr-3 border border-slate-700">2</span> 
+                Service Description
+            </h3>
+            <p class="mb-3">Green Candle Dispatch is a <strong>Software-as-a-Service (SaaS) provider</strong>, not a freight broker or registered motor carrier. We provide automation tools to assist you in:</p>
+            <ul class="list-disc list-inside space-y-2 ml-4 mb-4 text-slate-400">
+                <li>Monitoring load boards and identifying freight opportunities.</li>
+                <li>Drafting communications to brokers.</li>
+                <li>Organizing paperwork (BOLs, Rate Cons).</li>
+                <li>Visualizing earnings and rewards.</li>
+            </ul>
+            <div class="bg-slate-800 p-4 rounded border-l-4 border-green-500">
+                <p class="text-sm text-white"><strong>Final Authority:</strong> You acknowledge that you retain 100% authority to accept or reject any load. All contracts for the transportation of freight are solely between you (the Carrier) and the Broker/Shipper.</p>
+            </div>
+        </section>
+
+        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-lg">
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center">
+                <span class="bg-slate-800 text-slate-500 text-sm px-2 py-1 rounded mr-3 border border-slate-700">3</span> 
+                Fees & Payments
+            </h3>
+            
+            <div class="space-y-6">
+                <div>
+                    <h4 class="text-lg font-bold text-green-400 mb-2">3.1 Monthly Subscription</h4>
+                    <p class="text-sm">You agree to pay the monthly subscription fee selected at checkout (e.g., $49/mo). This fee covers the cost of software access, AI usage, and data storage. It is non-refundable.</p>
+                </div>
+
+                <div>
+                    <h4 class="text-lg font-bold text-green-400 mb-2">3.2 The 2% Protocol Fee</h4>
+                    <p class="text-sm mb-2">For every load processed through the Service, a transaction fee of <strong>2.0% of Gross Revenue</strong> is assessed. </p>
+                    <p class="text-sm">You expressly authorize your Factoring Company (e.g., OTR Solutions) to deduct this fee from your settlement and remit it to Green Candle Dispatch LLC. This fee facilitates the "Rewards Program" described in Section 4.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-slate-900 border border-green-900/30 rounded-2xl p-8 shadow-lg relative overflow-hidden">
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center relative z-10">
+                <span class="bg-slate-800 text-slate-500 text-sm px-2 py-1 rounded mr-3 border border-slate-700">4</span> 
+                The $CANDLE Rewards Program
+            </h3>
+            
+            <div class="space-y-6 relative z-10">
+                <div>
+                    <h4 class="text-lg font-bold text-green-400 mb-2">4.1 Nature of Rewards</h4>
+                    <p class="text-sm mb-2">We operate a loyalty rebate program. Upon collection of the Protocol Fee (Sec 3.2), we credit your account with <strong>$CANDLE</strong> tokens.</p>
+                    <p class="text-xs text-slate-500 uppercase tracking-wide font-bold">⚠️ $CANDLE IS A LOYALTY POINT. IT IS NOT A SECURITY, INVESTMENT CONTRACT, OR SHARE OF STOCK.</p>
+                </div>
+
+                <div>
+                    <h4 class="text-lg font-bold text-green-400 mb-2">4.2 The 180-Day Lock</h4>
+                    <p class="text-sm">To ensure the stability of the network, all Rewards are subject to a strict <strong>180-day Vesting Period</strong> ("Lock") starting from the date of the load.</p>
+                    <ul class="list-disc list-inside space-y-1 ml-4 mt-2 text-sm text-slate-400">
+                        <li><strong>Locked State:</strong> Tokens cannot be withdrawn, transferred, or sold.</li>
+                        <li><strong>Vested State:</strong> After 180 days, tokens unlock and are yours to keep.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-slate-900 border border-red-900/30 rounded-2xl p-8 shadow-lg">
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center">
+                <span class="bg-slate-800 text-slate-500 text-sm px-2 py-1 rounded mr-3 border border-slate-700">8</span> 
+                Termination & Forfeiture
+            </h3>
+            <p class="mb-4">You may cancel your subscription at any time via your dashboard.</p>
+            
+            <div class="bg-red-900/10 border border-red-500/20 p-4 rounded text-sm">
+                <h5 class="text-red-400 font-bold uppercase mb-2">⚠️ Forfeiture Warning</h5>
+                <p class="mb-2">Participation in the Rewards Program requires an active subscription.</p>
+                <p>If you cancel your subscription or your account is terminated for cause:</p>
+                <ul class="list-disc list-inside ml-2 mt-2 text-slate-300">
+                    <li>Any <strong>Vested (Unlocked)</strong> tokens are yours to keep.</li>
+                    <li>Any <strong>Unvested (Locked)</strong> tokens are immediately <strong>FORFEITED</strong> and returned to the community rewards pool.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 shadow-lg">
+            <h3 class="text-xl font-bold text-slate-200 mb-4 flex items-center">
+                <span class="bg-slate-800 text-slate-500 text-sm px-2 py-1 rounded mr-3 border border-slate-700">9</span> 
+                Risk Disclosure ("Straight Talk")
+            </h3>
+            <p class="text-slate-400 mb-4 italic">We believe in transparency. Here is the reality of the road:</p>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h4 class="text-white font-bold mb-2">The Freight</h4>
+                    <p class="text-sm text-slate-400">We don't drive the truck. We are not responsible for detention time, layovers, breakdowns, or brokers who don't pay. We provide the data; you make the business decisions.</p>
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-2">The Token</h4>
+                    <p class="text-sm text-slate-400">The value of digital assets can fluctuate wildly. Do not treat $CANDLE as your primary income. It is a bonus mechanism. We make no guarantees regarding its future value or liquidity.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-lg">
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center">
+                <span class="bg-slate-800 text-slate-500 text-sm px-2 py-1 rounded mr-3 border border-slate-700">10</span> 
+                Governing Law
+            </h3>
+            <p class="mb-3">These Terms are governed by the laws of the <strong>State of Delaware</strong>.</p>
+            <p class="text-sm text-slate-400">Any disputes shall be resolved through binding individual arbitration. You explicitly waive your right to participate in any class-action lawsuit against Green Candle Dispatch LLC.</p>
+        </section>
+
+        <div class="text-center pt-8 border-t border-slate-800">
+            <p class="text-slate-500 text-sm">Questions? Contact Legal at <a href="mailto:legal@greencandledispatch.com" class="text-green-400 hover:underline">legal@greencandledispatch.com</a></p>
+        </div>
+
+    </article>
+</section>
+{% endblock %}

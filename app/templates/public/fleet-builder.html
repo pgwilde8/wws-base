@@ -1,0 +1,78 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<section class="max-w-4xl mx-auto px-4 py-16 space-y-12">
+    
+    <header class="text-center space-y-6">
+        <div class="inline-block bg-green-900/30 border border-green-500/30 rounded-full px-4 py-1">
+            <span class="text-green-400 text-xs font-bold uppercase tracking-widest">Coming Soon</span>
+        </div>
+        <h1 class="text-4xl sm:text-6xl font-black text-white">
+            Build a Fleet.<br>
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">Buy Zero Trucks.</span>
+        </h1>
+        <p class="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
+            The <strong>Green Candle Fleet Builder</strong> program turns your network into net worth. Refer other owner-operators and earn recurring monthly income from every load they haul.
+        </p>
+    </header>
+
+    
+    <div class="grid md:grid-cols-3 gap-6 text-center">
+        <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 relative group hover:border-green-500/30 transition">
+            <div class="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-700 text-2xl">
+                🔗
+            </div>
+            <h3 class="text-white font-bold text-lg mb-2">1. You Share</h3>
+            <p class="text-slate-400 text-sm">Grab your unique "Fleet Builder" link from your dashboard and text it to your driver friends.</p>
+        </div>
+
+        <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 relative group hover:border-green-500/30 transition">
+            <div class="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-700 text-2xl">
+                🚛
+            </div>
+            <h3 class="text-white font-bold text-lg mb-2">2. They Drive</h3>
+            <p class="text-slate-400 text-sm">They sign up for Green Candle Dispatch and start moving freight using our AI tools.</p>
+        </div>
+
+        <div class="bg-slate-900 p-6 rounded-2xl border border-green-500/20 shadow-lg shadow-green-900/10 relative group">
+            <div class="w-12 h-12 bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-500/50 text-2xl">
+                💸
+            </div>
+            <h3 class="text-white font-bold text-lg mb-2">3. You Earn</h3>
+            <p class="text-slate-400 text-sm">You get paid a commission for every month your recruits stay active. Passive. Recurring. Simple.</p>
+        </div>
+    </div>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-8 md:p-12 text-center">
+        <h2 class="text-2xl font-bold text-white mb-6">Why are we doing this?</h2>
+        <p class="text-slate-300 mb-6 max-w-2xl mx-auto">
+            Traditional brokers spend millions on ads. We prefer to pay <strong>you</strong>. 
+            We believe the best way to grow the Green Candle network is to reward the drivers who built it.
+        </p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm font-mono text-slate-400 border-t border-slate-800 pt-6">
+            <div>🚫 No Truck Payments</div>
+            <div>🚫 No Insurance Costs</div>
+            <div>🚫 No Maintenance</div>
+            <div class="text-green-400 font-bold">✅ 100% Profit</div>
+        </div>
+    </section>
+
+    <div class="bg-gradient-to-r from-green-900/40 to-slate-900 border border-green-500/30 rounded-2xl p-8 text-center space-y-6">
+        <div>
+            <h3 class="text-2xl font-bold text-white mb-2">Program Launching Soon</h3>
+            <p class="text-slate-300">We are finalizing partnerships to maximize your payout.</p>
+        </div>
+        
+        <form class="max-w-sm mx-auto flex gap-2">
+            <input type="email" placeholder="Enter your email" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-green-500 focus:border-green-500">
+            <button type="button" class="bg-green-500 hover:bg-green-400 text-slate-900 font-bold px-6 py-3 rounded-lg transition">
+                Notify Me
+            </button>
+        </form>
+        <p class="text-xs text-slate-500">
+            Already a member? <a href="/login" class="text-green-400 hover:underline">Check your dashboard</a> for early access.
+        </p>
+    </div>
+
+</section>
+{% endblock %}
