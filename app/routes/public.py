@@ -181,6 +181,15 @@ async def find_loads(request: Request):
     )
 
 
+@router.get("/test-loads", response_class=HTMLResponse)
+def test_loads_page(request: Request):
+    """
+    Test page for Chrome Extension scraping.
+    Contains a simple HTML table that the extension can scrape.
+    """
+    return templates.TemplateResponse("public/test_loads.html", {"request": request})
+
+
 @router.post("/webhook/email/broker-reply", response_class=JSONResponse)
 async def handle_broker_reply_email(request: Request, body: dict = Body(...), background_tasks: BackgroundTasks = None):
     """

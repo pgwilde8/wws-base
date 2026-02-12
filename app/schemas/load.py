@@ -32,3 +32,17 @@ class LoadResponse(LoadBase):
 
     class Config:
         from_attributes = True
+
+
+# Ingestion schema for Chrome Extension scraping
+class LoadIngestionBase(BaseModel):
+    ref_id: str
+    origin: str
+    destination: str
+    price: str
+    equipment_type: str
+    pickup_date: Optional[str] = None
+
+
+class LoadCreate(LoadIngestionBase):
+    pass

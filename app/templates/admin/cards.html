@@ -1,0 +1,91 @@
+{% extends "layout/admin_base.html" %}
+{% block content %}
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<div class="p-6 bg-slate-900 min-h-screen">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-2xl font-black text-white italic">CARD FULFILLMENT QUEUE</h1>
+        <div class="bg-indigo-900/30 border border-indigo-500/30 px-4 py-2 rounded-lg">
+            <span class="text-xs text-indigo-400 font-bold uppercase">Pending Requests</span>
+            <p class="text-xl font-black text-white">{{ pending_count }}</p>
+        </div>
+    </div>
+
+    {% if requests and requests|length > 0 %}
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden shadow-2xl">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-black/50 text-slate-500 uppercase text-[10px] font-bold tracking-widest">
+                <tr>
+                    <th class="px-6 py-4">Driver (MC)</th>
+                    <th class="px-6 py-4">Address</th>
+                    <th class="px-6 py-4">Date Requested</th>
+                    <th class="px-6 py-4">Last 4 Digits</th>
+                    <th class="px-6 py-4 text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-700">
+                {% for card in requests %}
+                <tr id="card-row-{{ card.id }}">
+                    <td class="px-6 py-4 text-white font-mono">{{ card.trucker_mc }}</td>
+                    <td class="px-6 py-4 text-slate-400">
+                        {% if card.address_line1 %}
+                            {{ card.address_line1 }}{% if card.address_line2 %}, {{ card.address_line2 }}{% endif %}<br>
+                            {{ card.city }}, {{ card.state }} {{ card.zip }}
+                        {% else %}
+                            <span class="text-slate-600 italic">No address on file</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-slate-400">
+                        {% if card.requested_at %}
+                            {{ card.requested_at.strftime('%m/%d/%Y') if card.requested_at.strftime else card.requested_at }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if card.status == 'REQUESTED' %}
+                        <input type="text" 
+                               name="last_four" 
+                               id="last_four_{{ card.id }}"
+                               placeholder="0000" 
+                               maxlength="4"
+                               pattern="[0-9]{4}"
+                               class="w-20 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-xs font-mono">
+                        {% else %}
+                        <span class="text-indigo-400 font-mono">{{ card.card_last_four or 'N/A' }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        {% if card.status == 'REQUESTED' %}
+                        <button 
+                            hx-post="/admin/cards/ship/{{ card.id }}"
+                            hx-include="#last_four_{{ card.id }}"
+                            hx-target="#card-row-{{ card.id }}"
+                            hx-swap="outerHTML"
+                            class="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black py-2 px-4 rounded transition shadow-lg shadow-indigo-900/20">
+                            MARK SHIPPED
+                        </button>
+                        {% elif card.status == 'SHIPPED' %}
+                        <span class="text-blue-400 text-xs font-bold">SHIPPED</span>
+                        {% elif card.status == 'ACTIVE' %}
+                        <span class="text-green-400 text-xs font-bold">ACTIVE</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 p-12 text-center">
+        <div class="text-slate-500 text-lg mb-2">No Card Requests</div>
+        <div class="text-slate-600 text-sm">All card requests have been processed.</div>
+    </div>
+    {% endif %}
+
+    <div class="mt-8">
+        <a href="/admin/dashboard" class="text-indigo-400 hover:text-indigo-300 text-sm font-bold">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}

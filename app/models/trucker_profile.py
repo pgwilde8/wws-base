@@ -18,6 +18,10 @@ class TruckerProfile(Base):
     carrier_name = Column(String(200), nullable=True)       # Fleet/carrier
     truck_identifier = Column(String(80), nullable=True)     # Unit #, plate, or "Truck 1"
     mc_number = Column(String(50), nullable=True)           # MC if applicable
+    dot_number = Column(String(50), nullable=True)          # DOT number if applicable
+    authority_type = Column(String(10), default="MC")      # 'MC' or 'DOT' - which identifier is primary
+    reward_tier = Column(String(20), default="STANDARD")     # 'STANDARD' (75/25) or 'INCENTIVE' (90/10)
+    wallet_address = Column(String(255), nullable=True)     # Solana/Ethereum wallet for token claims
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

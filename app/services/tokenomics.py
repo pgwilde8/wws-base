@@ -72,11 +72,12 @@ def credit_driver_savings(db, load_id: str, mc_number: str, fee_usd: float):
     """
     from datetime import datetime, timedelta
     from sqlalchemy import text
+    from app.services.token_price import TokenPriceService
     
-    # --- PHASE 1 MATH: Stable Value ---
-    # For now, 1 Fee Dollar = 1 Token (Simplifies the pitch to drivers)
-    # Later, you can fetch the real price from CoinGecko.
-    tokens_earned = fee_usd * 1.0 
+    # Calculate tokens based on current market price
+    # This ensures drivers see accurate token amounts and can track growth
+    current_price = TokenPriceService.get_candle_price()
+    tokens_earned = fee_usd / current_price if current_price > 0 else 0.0 
     
     # --- THE LOGIC ---
     sql = text("""

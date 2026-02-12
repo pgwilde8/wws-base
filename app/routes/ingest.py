@@ -1,94 +1,88 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Body
+from fastapi import APIRouter, HTTPException, Depends, Request, Header
+from sqlalchemy.orm import Session
+from typing import List, Optional
+import logging
+from app.core.deps import get_db, engine
 from sqlalchemy import text
-import json
+import app.crud as crud
+from app.schemas.load import LoadCreate
 
-from app.core.deps import engine
-# from app.services.ai_agent import evaluate_load_profitability # Uncomment when AI is ready
+# Configure Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ingest")
 
 router = APIRouter()
 
+def analyze_profitability(load: LoadCreate):
+    try:
+        clean_price = load.price.replace("$", "").replace(",", "").strip()
+        price_num = float(clean_price)
+        if price_num >= 2000:
+            return True, price_num
+        return False, price_num
+    except:
+        return False, 0
 
-@router.post("/api/ingest/loads")
-async def ingest_loads(
-    background_tasks: BackgroundTasks,
-    loads_data: list = Body(...)
+
+def get_trucker_by_api_key(api_key: Optional[str]) -> Optional[int]:
+    """Get trucker_id from API key. Returns None if invalid."""
+    if not api_key or not engine:
+        return None
+    try:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT id FROM webwise.trucker_profiles WHERE scout_api_key = :api_key"),
+                {"api_key": api_key}
+            ).fetchone()
+            return row.id if row else None
+    except Exception as e:
+        logger.error(f"Error looking up API key: {e}")
+        return None
+
+
+@router.post("/loads", status_code=200)
+def ingest_loads(
+    loads: List[LoadCreate], 
+    db: Session = Depends(get_db),
+    request: Request = None,
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
 ):
     """
-    Receives raw load data from the Chrome Extension (Chrome Extension "Side-Saddle" method).
-    Expects JSON body: [{'ref_id': '...', 'origin': '...', 'destination': '...', 'price': '...', ...}]
-    
-    This is the "Zero-Budget" scraping approach - driver's Chrome extension sends data to your backend.
+    Ingest loads from Chrome Extension.
+    Requires API key authentication via X-API-Key header.
     """
-    if not engine:
-        raise HTTPException(status_code=500, detail="Database not configured")
+    # Authenticate via API key
+    trucker_id = get_trucker_by_api_key(x_api_key)
     
-    try:
-        # If it's a single dict, wrap in list
-        if isinstance(loads_data, dict):
-            loads_data = [loads_data]
-            
-        new_load_count = 0
-        updated_load_count = 0
-        
-        with engine.begin() as conn:
-            for raw_load in loads_data:
-                ref_id = raw_load.get('ref_id')
-                if not ref_id:
-                    continue
+    if not trucker_id:
+        logger.warning("⚠️ [INGEST] Unauthorized request - missing or invalid API key")
+        raise HTTPException(status_code=401, detail="Invalid or missing API key. Please configure your Scout Extension.")
+    
+    logger.info(f"📥 [INGEST] Received payload batch of {len(loads)} loads from trucker_id={trucker_id}")
 
-                # 1. Check if load exists (deduplication)
-                existing = conn.execute(
-                    text("SELECT id FROM webwise.loads WHERE ref_id = :ref_id"),
-                    {"ref_id": str(ref_id)}
-                ).fetchone()
-                
-                if existing:
-                    # Update timestamp if load already exists
-                    conn.execute(
-                        text("UPDATE webwise.loads SET updated_at = now() WHERE ref_id = :ref_id"),
-                        {"ref_id": str(ref_id)}
-                    )
-                    updated_load_count += 1
-                    continue
-                
-                # 2. Create New Load (store raw scrape data)
-                conn.execute(
-                    text("""
-                        INSERT INTO webwise.loads (
-                            ref_id, origin, destination, price, equipment_type, 
-                            pickup_date, status, raw_data, created_at
-                        )
-                        VALUES (
-                            :ref_id, :origin, :destination, :price, :equipment_type,
-                            :pickup_date, :status, :raw_data::jsonb, now()
-                        )
-                    """),
-                    {
-                        "ref_id": str(ref_id),
-                        "origin": raw_load.get('origin', 'Unknown'),
-                        "destination": raw_load.get('destination', 'Unknown'),
-                        "price": raw_load.get('price'),
-                        "equipment_type": raw_load.get('equipment_type', 'Unknown'),
-                        "pickup_date": raw_load.get('pickup_date'),
-                        "status": "NEW",
-                        "raw_data": json.dumps(raw_load)  # Store full blob as JSONB
-                    }
-                )
-                new_load_count += 1
-                
-                # 3. TRIGGER AI EVALUATION (Future Step)
-                # When AI is ready, this will analyze profitability and auto-draft negotiations
-                # background_tasks.add_task(evaluate_load_profitability, ref_id)
-        
-        return {
-            "status": "success", 
-            "message": f"Processed {len(loads_data)} items.",
-            "new_loads": new_load_count,
-            "updated_loads": updated_load_count
-        }
+    new_count = 0
+    high_value_count = 0
 
-    except Exception as e:
-        import traceback
-        print(f"❌ Ingestion Error: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+    for load_data in loads:
+        # Deduplicate
+        existing_load = crud.get_load_by_ref(db, ref_id=load_data.ref_id)
+        if existing_load:
+            continue
+
+        # Analyze
+        is_winner, numeric_price = analyze_profitability(load_data)
+
+        if is_winner:
+            logger.info(f"🔥 HOT LOAD: {load_data.origin} -> {load_data.destination} (${numeric_price})")
+            high_value_count += 1
+
+        # Save with discoverer tracking
+        crud.create_load(db=db, load=load_data, discovered_by_id=trucker_id)
+        new_count += 1
+
+    return {
+        "status": "success", 
+        "new": new_count, 
+        "hot": high_value_count,
+        "message": f"Processed {new_count} loads. {high_value_count} high-value loads detected."
+    }

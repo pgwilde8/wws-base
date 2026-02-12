@@ -1,0 +1,88 @@
+{% extends "layout/admin_base.html" %}
+{% block content %}
+<script src="https://unpkg.com/htmx.org@1.9.10" crossorigin="anonymous"></script>
+<section class="max-w-6xl mx-auto px-4 py-10 space-y-8">
+  <header class="flex flex-col gap-2">
+    <p class="text-sm uppercase tracking-[0.3em] text-emerald-300">Admin</p>
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-white">Driver Management</h1>
+    <p class="text-gray-300">Manage driver reward tiers and monitor performance.</p>
+  </header>
+
+  <div class="bg-gray-900/60 border border-white/10 rounded-2xl p-6">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm text-left text-gray-300">
+        <thead class="text-xs uppercase text-gray-400 border-b border-white/10">
+          <tr>
+            <th class="py-3 px-4">Driver</th>
+            <th class="py-3 px-4">MC Number</th>
+            <th class="py-3 px-4">Email</th>
+            <th class="py-3 px-4">Wins</th>
+            <th class="py-3 px-4">Revenue</th>
+            <th class="py-3 px-4">Reward Tier</th>
+            <th class="py-3 px-4">Joined</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5">
+          {% if drivers %}
+            {% for driver in drivers %}
+            <tr class="hover:bg-gray-800/40">
+              <td class="py-4 px-4">
+                <div class="font-semibold text-white">{{ driver.display_name }}</div>
+                {% if driver.carrier_name %}
+                <div class="text-xs text-gray-500">{{ driver.carrier_name }}</div>
+                {% endif %}
+              </td>
+              <td class="py-4 px-4 font-mono text-xs">{{ driver.mc_number }}</td>
+              <td class="py-4 px-4 text-xs">{{ driver.email }}</td>
+              <td class="py-4 px-4">
+                <span class="bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded text-xs font-bold">
+                  {{ driver.win_count }}
+                </span>
+              </td>
+              <td class="py-4 px-4 font-mono text-xs">
+                ${{ "{:,.2f}".format(driver.total_revenue) }}
+              </td>
+              <td class="py-4 px-4">
+                <select 
+                  hx-patch="/admin/drivers/{{ driver.id }}/update-tier" 
+                  hx-trigger="change"
+                  hx-include="[name='tier']"
+                  hx-target="closest td"
+                  hx-swap="innerHTML"
+                  name="tier"
+                  class="bg-slate-800 text-xs text-white border border-slate-700 rounded px-2 py-1 focus:ring-green-500 focus:border-green-500">
+                  <option value="STANDARD" {% if driver.reward_tier == 'STANDARD' %}selected{% endif %}>
+                    75/25 (Standard)
+                  </option>
+                  <option value="INCENTIVE" {% if driver.reward_tier == 'INCENTIVE' %}selected{% endif %}>
+                    90/10 (Incentive)
+                  </option>
+                </select>
+              </td>
+              <td class="py-4 px-4 text-xs text-gray-400">
+                {{ driver.created_at.strftime('%b %d, %Y') if driver.created_at else 'N/A' }}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="7" class="py-8 px-4 text-center text-gray-400">
+                No drivers found. Drivers will appear here once they register.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="bg-emerald-900/20 border border-emerald-500/30 rounded-xl p-4">
+    <h3 class="text-emerald-300 font-bold mb-2">💡 Reward Tier Strategy</h3>
+    <ul class="text-sm text-gray-300 space-y-1">
+      <li><strong class="text-white">Standard (75/25):</strong> Driver gets 75% of revenue, 25% goes to $CANDLE buyback</li>
+      <li><strong class="text-white">Incentive (90/10):</strong> Driver gets 90% of revenue, 10% goes to $CANDLE buyback</li>
+      <li class="text-xs text-gray-400 mt-2">Use Incentive tier to win drivers from competitors or reward high performers.</li>
+    </ul>
+  </div>
+</section>
+{% endblock %}

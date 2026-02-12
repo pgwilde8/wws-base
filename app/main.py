@@ -33,7 +33,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(client_router)
 app.include_router(legal_router)
-app.include_router(ingest_router)  # Chrome Extension ingestion endpoint
+app.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"])  # Chrome Extension ingestion endpoint
 
 PORT = int(os.getenv("PORT", "8990"))
 

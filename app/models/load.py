@@ -2,7 +2,7 @@
 Load model - stores raw scrape results from load boards.
 Used by Chrome Extension ingestion endpoint.
 """
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 
@@ -27,6 +27,9 @@ class Load(Base):
     
     # Store the raw scrape data here just in case parsing fails
     raw_data = Column(JSONB)
+    
+    # Track who discovered this load (for Finder's Fee rewards)
+    discovered_by_id = Column(Integer, ForeignKey("webwise.trucker_profiles.id"), nullable=True, index=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

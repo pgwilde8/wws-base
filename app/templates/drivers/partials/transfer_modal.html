@@ -1,0 +1,56 @@
+<div id="transfer-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="if(event.target === this) this.remove()">
+    <div class="bg-slate-900 rounded-2xl border border-indigo-500/30 p-6 max-w-md w-full shadow-2xl">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-black text-white">Load Card from Vault</h3>
+            <button onclick="document.getElementById('transfer-modal').remove()" 
+                    class="text-slate-500 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="space-y-4">
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <div class="text-[10px] text-slate-500 uppercase mb-2">Available to Transfer</div>
+                <div class="text-2xl font-black text-green-400">{{ "{:,.2f}".format(claimable_balance) }} $CANDLE</div>
+                <div class="text-xs text-slate-400 mt-1">≈ ${{ "{:,.2f}".format(claimable_balance * token_price) }} USD</div>
+            </div>
+            
+            <div class="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <div class="text-[10px] text-slate-500 uppercase mb-2">Current Card Balance</div>
+                <div class="text-2xl font-black text-indigo-400">${{ "{:,.2f}".format(card_balance) }}</div>
+            </div>
+            
+            <form hx-post="/clients/cards/transfer"
+                  hx-target="#transfer-result"
+                  hx-swap="innerHTML"
+                  hx-on::after-request="if(event.detail.successful) { setTimeout(() => { document.getElementById('transfer-modal').remove(); window.location.reload(); }, 2000); }">
+                <div class="mb-4">
+                    <label class="text-[10px] text-slate-400 uppercase font-bold mb-2 block">Amount to Transfer ($CANDLE)</label>
+                    <input type="number" 
+                           name="token_amount" 
+                           step="0.01"
+                           min="0.01"
+                           max="{{ claimable_balance }}"
+                           placeholder="0.00"
+                           required
+                           class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white font-mono text-lg focus:border-indigo-500 focus:outline-none">
+                    <div class="text-[9px] text-slate-500 mt-1">Enter amount in $CANDLE tokens</div>
+                </div>
+                
+                <div id="transfer-result"></div>
+                
+                <div class="flex gap-3">
+                    <button type="submit" 
+                            class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-xl transition shadow-lg shadow-indigo-900/40">
+                        TRANSFER
+                    </button>
+                    <button type="button" 
+                            onclick="document.getElementById('transfer-modal').remove()"
+                            class="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-xl transition">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

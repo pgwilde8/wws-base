@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Green Candle Scout",
+  "version": "1.0",
+  "description": "Scrapes load board data for the Green Candle Network.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:8990/*",
+    "http://localhost:8000/*",
+    "https://*.dat.com/*",
+    "https://*.truckstop.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}

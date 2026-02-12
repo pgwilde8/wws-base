@@ -1,0 +1,80 @@
+<div class="px-4 mb-6">
+    <div class="bg-gradient-to-br from-slate-900 to-green-900/20 rounded-2xl border border-green-500/30 p-5 shadow-2xl">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="bg-green-500/20 p-3 rounded-full">
+                <i class="fas fa-search text-green-400 text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-green-400 text-sm font-black uppercase tracking-tighter">Green Candle Scout</h3>
+                <p class="text-[10px] text-slate-400">Chrome Extension Configuration</p>
+            </div>
+        </div>
+
+        {% if active_identifier %}
+        <div class="bg-slate-950 rounded-xl p-3 border border-green-500/30 mb-4">
+            <div class="text-[10px] text-slate-500 uppercase mb-1 font-bold">Scout Status</div>
+            <div class="text-green-400 font-mono text-sm font-bold">
+                <i class="fas fa-check-circle mr-2"></i>Scouting as {{ active_identifier }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if api_key %}
+        <div class="bg-slate-950 rounded-xl p-4 border border-green-500/30 mb-4">
+            <div class="text-[10px] text-slate-500 uppercase mb-2 font-bold">Your API Key</div>
+            <div class="flex items-center gap-2 mb-3">
+                <code class="flex-1 bg-black/50 border border-slate-700 rounded-lg px-3 py-2 text-green-400 font-mono text-xs break-all">
+                    {{ api_key }}
+                </code>
+                <button 
+                    onclick="navigator.clipboard.writeText('{{ api_key }}'); this.innerHTML='<i class=\\'fas fa-check\\'></i>'; setTimeout(() => this.innerHTML='<i class=\\'fas fa-copy\\'></i>', 2000);"
+                    class="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded-lg transition">
+                    <i class="fas fa-copy"></i>
+                </button>
+            </div>
+            <div class="text-[9px] text-slate-500">
+                Copy this key and paste it into your Scout Extension settings
+            </div>
+        </div>
+
+        <div class="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4 mb-4">
+            <div class="text-blue-400 text-xs font-bold mb-2">📋 Setup Instructions</div>
+            <ol class="text-[10px] text-slate-300 space-y-2 list-decimal list-inside">
+                <li>Open Chrome and go to <code class="bg-black/50 px-1 rounded">chrome://extensions</code></li>
+                <li>Find "Green Candle Scout" and click "Details"</li>
+                <li>Click "Extension options" or open the popup</li>
+                <li>Paste your API key in the "API Key" field</li>
+                <li>Click "Save" - the extension icon will turn green when connected</li>
+            </ol>
+        </div>
+
+        <button 
+            hx-post="/clients/scout/generate-api-key"
+            hx-target="#scout-config-container"
+            hx-swap="innerHTML"
+            class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-black py-2 px-4 rounded-lg transition text-xs">
+            <i class="fas fa-key mr-2"></i>REGENERATE API KEY
+        </button>
+        {% else %}
+        <div class="bg-slate-950 rounded-xl p-4 border border-slate-700 mb-4">
+            <div class="text-center py-4">
+                <div class="text-slate-500 text-sm mb-2">No API Key Generated</div>
+                <div class="text-[10px] text-slate-600 mb-4">Generate an API key to connect your Scout Extension</div>
+                <button 
+                    hx-post="/clients/scout/generate-api-key"
+                    hx-target="#scout-config-container"
+                    hx-swap="innerHTML"
+                    class="bg-green-600 hover:bg-green-500 text-white font-black py-2 px-4 rounded-lg transition text-xs">
+                    <i class="fas fa-key mr-2"></i>GENERATE API KEY
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if message %}
+        <div class="mt-4 bg-green-900/40 border border-green-500 rounded-xl p-3 text-center">
+            <div class="text-green-400 text-xs font-bold">{{ message }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>

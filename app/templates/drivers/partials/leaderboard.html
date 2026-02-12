@@ -1,0 +1,38 @@
+<div class="px-4 mb-8">
+    <h3 class="text-slate-500 text-[10px] uppercase font-black mb-3 tracking-widest text-center">🏆 Fleet Fuel Champions</h3>
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+        {% if leaderboard and leaderboard|length > 0 %}
+        <table class="w-full text-left">
+            <thead class="bg-black/50 text-[9px] text-slate-500 uppercase">
+                <tr>
+                    <th class="px-4 py-3">Rank</th>
+                    <th class="px-4 py-3">Driver (MC)</th>
+                    <th class="px-4 py-3 text-right">Free Fuel Earned</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+                {% for entry in leaderboard %}
+                <tr class="{% if loop.index == 1 %}bg-yellow-500/5{% elif loop.index == 2 %}bg-slate-800/30{% elif loop.index == 3 %}bg-amber-900/20{% endif %}">
+                    <td class="px-4 py-3 {% if loop.index == 1 %}text-yellow-500{% elif loop.index == 2 %}text-slate-300{% elif loop.index == 3 %}text-amber-400{% else %}text-slate-400{% endif %} font-bold">
+                        {% if loop.index == 1 %}1st
+                        {% elif loop.index == 2 %}2nd
+                        {% elif loop.index == 3 %}3rd
+                        {% else %}{{ loop.index }}th
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-white font-mono text-xs">{{ entry.mc_number }}</td>
+                    <td class="px-4 py-3 text-right {% if loop.index == 1 %}text-blue-400 font-black{% else %}text-blue-400 font-bold{% endif %}">
+                        {{ "{:.1f}".format(entry.total_gallons_earned) }} GAL
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="p-8 text-center">
+            <div class="text-slate-500 text-sm mb-2">No fuel champions yet</div>
+            <div class="text-[10px] text-slate-600">Complete loads to earn your first free gallons!</div>
+        </div>
+        {% endif %}
+    </div>
+</div>

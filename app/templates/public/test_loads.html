@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Loads - Green Candle Extension Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1e293b;
+            color: white;
+        }
+        h1 {
+            color: #22c55e;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: #334155;
+        }
+        th {
+            background: #22c55e;
+            color: #0f172a;
+            padding: 12px;
+            text-align: left;
+        }
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #475569;
+        }
+        tr:hover {
+            background: #475569;
+        }
+        .instructions {
+            background: #334155;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #22c55e;
+        }
+    </style>
+</head>
+<body>
+    <h1>🕯️ Green Candle Extension Test Page</h1>
+    
+    <div class="instructions">
+        <h3>How to Test:</h3>
+        <ol>
+            <li>Make sure your FastAPI server is running (port 8990)</li>
+            <li>Install the Green Candle Scout Chrome Extension</li>
+            <li>Click the extension icon → Click "SCRAPE PAGE"</li>
+            <li>Check your server console for the POST request</li>
+            <li>Check your database: <code>SELECT * FROM webwise.loads;</code></li>
+        </ol>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Origin</th>
+                <th>Destination</th>
+                <th>Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Newark, NJ</td>
+                <td>Miami, FL</td>
+                <td>$3500</td>
+            </tr>
+            <tr>
+                <td>Chicago, IL</td>
+                <td>Dallas, TX</td>
+                <td>$2200</td>
+            </tr>
+            <tr>
+                <td>Los Angeles, CA</td>
+                <td>Phoenix, AZ</td>
+                <td>$1800</td>
+            </tr>
+            <tr>
+                <td>Atlanta, GA</td>
+                <td>Charlotte, NC</td>
+                <td>$1200</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!-- Wallet Setup Modal -->
+<div id="wallet-modal" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onclick="if(event.target === this) this.remove()">
+    <div class="bg-slate-900 rounded-2xl border border-amber-500/50 p-6 max-w-md w-full shadow-2xl">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-black text-amber-400">Setup Wallet Address</h3>
+            <button onclick="document.getElementById('wallet-modal').remove()" class="text-slate-500 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <p class="text-slate-400 text-sm mb-4">
+            Enter your Solana or Ethereum wallet address to receive $CANDLE tokens when you claim.
+        </p>
+        
+        <form hx-post="/clients/wallet/setup" 
+              hx-target="#claim-modal-container"
+              hx-swap="innerHTML"
+              class="space-y-4">
+            <div>
+                <label class="block text-xs text-slate-400 mb-2">Wallet Address</label>
+                <input type="text" 
+                       name="wallet_address" 
+                       placeholder="0x... or Solana address"
+                       required
+                       pattern="^(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$"
+                       class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono text-sm">
+                <p class="text-[10px] text-slate-500 mt-1">Supports Ethereum (0x...) and Solana addresses</p>
+            </div>
+            
+            <div class="flex gap-2">
+                <button type="submit" 
+                        class="flex-1 bg-amber-600 hover:bg-amber-500 text-black font-black uppercase text-sm py-3 px-4 rounded-xl transition">
+                    <i class="fas fa-save mr-2"></i>SAVE WALLET
+                </button>
+                <button type="button" 
+                        onclick="document.getElementById('wallet-modal').remove()"
+                        class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm py-3 px-4 rounded-xl transition">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

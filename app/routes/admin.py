@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, status, Body
 from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from sqlalchemy import text
+import logging
 
 from app.core.deps import templates, engine, require_admin, get_db
 from app.services.payments import RevenueService
@@ -8,6 +9,8 @@ from app.services.referral import ReferralService
 from app.services.email import send_negotiation_email, parse_broker_reply
 from app.services.buyback_notifications import BuybackNotificationService
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -116,14 +119,14 @@ async def mark_negotiation_won(negotiation_id: int, body: dict = Body(...)):
     if not engine:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database not configured")
     
-    # Get negotiation details including trucker info
+    # Get negotiation details including trucker info and load_id
     with engine.begin() as conn:
         r = conn.execute(
             text("""
                 UPDATE webwise.negotiations
                 SET status = 'won', final_rate = :final_rate, updated_at = now()
                 WHERE id = :id
-                RETURNING id, trucker_id, origin, destination
+                RETURNING id, trucker_id, origin, destination, load_id
             """),
             {"id": negotiation_id, "final_rate": final_rate},
         )
@@ -131,25 +134,29 @@ async def mark_negotiation_won(negotiation_id: int, body: dict = Body(...)):
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Negotiation not found")
         
-        negotiation_id_db, trucker_id, origin, destination = row
+        negotiation_id_db, trucker_id, origin, destination, load_id = row
         
-        # Get trucker info for notification
+        # Get trucker info and reward tier for dynamic buyback calculation
         trucker_name = None
         mc_number = None
+        reward_tier = "STANDARD"
         if trucker_id:
             trucker_row = conn.execute(
-                text("SELECT display_name, mc_number FROM webwise.trucker_profiles WHERE id = :id"),
+                text("SELECT display_name, mc_number, reward_tier FROM webwise.trucker_profiles WHERE id = :id"),
                 {"id": trucker_id}
             ).fetchone()
             if trucker_row:
-                trucker_name, mc_number = trucker_row[0], trucker_row[1]
+                trucker_name, mc_number, reward_tier = trucker_row[0], trucker_row[1], (trucker_row[2] or "STANDARD")
             
             # Create driver notification (will appear via HTMX polling within 30s)
             route_info = ""
             if origin and destination:
                 route_info = f" ({origin} → {destination})"
             
-            buyback_amount = round(final_rate * 0.02, 2)
+            # Calculate buyback based on reward tier
+            from app.services.reward_tier import RewardTierService
+            buyback_amount = RewardTierService.calculate_buyback_amount(final_rate, reward_tier)
+            
             conn.execute(
                 text("""
                     INSERT INTO webwise.notifications (trucker_id, message, notif_type, is_read)
@@ -160,8 +167,69 @@ async def mark_negotiation_won(negotiation_id: int, body: dict = Body(...)):
                     "message": f"💰 WIN! ${final_rate:,.2f} load secured{route_info}. ${buyback_amount:,.2f} added to $CANDLE buyback pool.",
                 },
             )
+            
+            # Check for Finder's Fee: If load was discovered by someone else, credit them
+            if load_id and str(load_id).strip():
+                # Look up the Load by ref_id (negotiations.load_id matches loads.ref_id)
+                load_row = conn.execute(
+                    text("SELECT discovered_by_id FROM webwise.loads WHERE ref_id = :load_id"),
+                    {"load_id": str(load_id).strip()}
+                ).fetchone()
+                
+                if load_row and load_row.discovered_by_id and load_row.discovered_by_id != trucker_id:
+                    # This load was discovered by a different driver - credit Finder's Fee
+                    discoverer_id = load_row.discovered_by_id
+                    
+                    # Get discoverer's MC number
+                    discoverer_row = conn.execute(
+                        text("SELECT mc_number FROM webwise.trucker_profiles WHERE id = :id"),
+                        {"id": discoverer_id}
+                    ).fetchone()
+                    
+                    if discoverer_row and discoverer_row.mc_number:
+                        from app.services.reward_tier import RewardTierService
+                        from app.services.token_price import TokenPriceService
+                        
+                        finders_fee_usd = RewardTierService.calculate_finders_fee(final_rate)
+                        
+                        # Credit Finder's Fee to discoverer's savings ledger
+                        from datetime import datetime, timedelta
+                        current_price = TokenPriceService.get_candle_price()
+                        tokens_earned = finders_fee_usd / current_price if current_price > 0 else 0.0
+                        unlock_date = datetime.now() + timedelta(days=180)
+                        
+                        conn.execute(
+                            text("""
+                                INSERT INTO webwise.driver_savings_ledger 
+                                (driver_mc_number, load_id, amount_usd, amount_candle, unlocks_at, status)
+                                VALUES (:mc, :load, :usd, :tokens, :unlock, 'LOCKED')
+                            """),
+                            {
+                                "mc": discoverer_row.mc_number,
+                                "load": f"FINDERS_FEE-{load_id}",
+                                "usd": finders_fee_usd,
+                                "tokens": tokens_earned,
+                                "unlock": unlock_date
+                            }
+                        )
+                        
+                        # Create notification for discoverer
+                        conn.execute(
+                            text("""
+                                INSERT INTO webwise.notifications (trucker_id, message, notif_type, is_read)
+                                VALUES (:trucker_id, :message, 'SYSTEM_ALERT', false)
+                            """),
+                            {
+                                "trucker_id": discoverer_id,
+                                "message": f"🎯 SCOUT BONUS: A load you discovered ({origin} → {destination}) was just booked! You've earned ${finders_fee_usd:,.2f} Finder's Fee ({tokens_earned:,.2f} $CANDLE).",
+                            }
+                        )
+                        
+                        logger.info(f"🎯 FINDERS FEE: Credited ${finders_fee_usd} to discoverer trucker_id={discoverer_id} for load {load_id}")
     
-    buyback_accrued = round(final_rate * 0.02, 2)
+    # Calculate buyback based on reward tier (use same calculation as above)
+    from app.services.reward_tier import RewardTierService
+    buyback_accrued = RewardTierService.calculate_buyback_amount(final_rate, reward_tier)
     
     # Send community-visible buyback notification (Slack/Discord)
     # This is the "Proof of Freight" mechanism
@@ -206,6 +274,126 @@ def admin_referral_stats(request: Request, db: Session = Depends(get_db)):
             "stats": stats,
             "leaderboard": leaderboard
         }
+    )
+
+
+@router.get("/admin/drivers", dependencies=[Depends(require_admin)])
+def drivers_management(request: Request):
+    """Admin view: Manage drivers and their reward tiers."""
+    if not engine:
+        return templates.TemplateResponse(
+            "admin/drivers.html",
+            {"request": request, "drivers": []}
+        )
+    
+    with engine.begin() as conn:
+        rows = conn.execute(text("""
+            SELECT 
+                tp.id,
+                tp.display_name,
+                tp.mc_number,
+                tp.carrier_name,
+                tp.reward_tier,
+                u.email,
+                u.created_at,
+                COUNT(n.id) FILTER (WHERE n.status = 'won') as win_count,
+                COALESCE(SUM(n.final_rate) FILTER (WHERE n.status = 'won'), 0) as total_revenue
+            FROM webwise.trucker_profiles tp
+            LEFT JOIN webwise.users u ON tp.user_id = u.id
+            LEFT JOIN webwise.negotiations n ON n.trucker_id = tp.id
+            GROUP BY tp.id, tp.display_name, tp.mc_number, tp.carrier_name, tp.reward_tier, u.email, u.created_at
+            ORDER BY tp.created_at DESC
+        """))
+        
+        drivers = []
+        for row in rows:
+            drivers.append({
+                "id": row.id,
+                "display_name": row.display_name or "Unknown",
+                "mc_number": row.mc_number or "N/A",
+                "carrier_name": row.carrier_name or "",
+                "reward_tier": row.reward_tier or "STANDARD",
+                "email": row.email or "N/A",
+                "created_at": row.created_at,
+                "win_count": row.win_count or 0,
+                "total_revenue": float(row.total_revenue or 0)
+            })
+    
+    return templates.TemplateResponse(
+        "admin/drivers.html",
+        {"request": request, "drivers": drivers}
+    )
+
+
+@router.patch("/admin/drivers/{driver_id}/update-tier", dependencies=[Depends(require_admin)])
+async def update_driver_tier(driver_id: int, request: Request):
+    """Update a driver's reward tier via HTMX."""
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    
+    # Get tier from form data (HTMX sends form-encoded)
+    form_data = await request.form()
+    tier = form_data.get('tier') or request.query_params.get('tier')
+    
+    if not tier or tier not in ['STANDARD', 'INCENTIVE']:
+        raise HTTPException(status_code=400, detail="Invalid tier. Must be 'STANDARD' or 'INCENTIVE'")
+    
+    with engine.begin() as conn:
+        # Verify driver exists and get current tier
+        check = conn.execute(
+            text("SELECT id, display_name, reward_tier FROM webwise.trucker_profiles WHERE id = :id"),
+            {"id": driver_id}
+        ).fetchone()
+        
+        if not check:
+            raise HTTPException(status_code=404, detail="Driver not found")
+        
+        old_tier = check.reward_tier or "STANDARD"
+        
+        # Update tier
+        conn.execute(
+            text("""
+                UPDATE webwise.trucker_profiles 
+                SET reward_tier = :tier, updated_at = now()
+                WHERE id = :id
+            """),
+            {"tier": tier, "id": driver_id}
+        )
+        
+        # If upgraded to INCENTIVE, send VIP notification
+        if tier == "INCENTIVE" and old_tier != "INCENTIVE":
+            conn.execute(
+                text("""
+                    INSERT INTO webwise.notifications (trucker_id, message, notif_type, is_read)
+                    VALUES (:trucker_id, :message, 'SYSTEM_ALERT', false)
+                """),
+                {
+                    "trucker_id": driver_id,
+                    "message": "🚀 VIP UPGRADE: Your account is now on the 90% Incentive Tier! Enjoy maximized rewards.",
+                }
+            )
+    
+    # Return the select dropdown with updated selection (HTMX will swap it)
+    tier_label = "75/25 (Standard)" if tier == "STANDARD" else "90/10 (Incentive)"
+    return HTMLResponse(
+        content=f'''
+        <select 
+          hx-patch="/admin/drivers/{driver_id}/update-tier" 
+          hx-trigger="change"
+          hx-include="[name='tier']"
+          hx-target="closest td"
+          hx-swap="innerHTML"
+          name="tier"
+          class="bg-slate-800 text-xs text-white border border-slate-700 rounded px-2 py-1 focus:ring-green-500 focus:border-green-500">
+          <option value="STANDARD" {'selected' if tier == 'STANDARD' else ''}>
+            75/25 (Standard)
+          </option>
+          <option value="INCENTIVE" {'selected' if tier == 'INCENTIVE' else ''}>
+            90/10 (Incentive)
+          </option>
+        </select>
+        ''',
+        headers={"HX-Trigger": "tierUpdated"}
     )
 
 
@@ -389,3 +577,174 @@ def view_leads_dashboard(request: Request):
             }
         }
     )
+
+
+@router.get("/admin/cards", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+def card_fulfillment_queue(request: Request):
+    """Admin view: Card fulfillment queue showing REQUESTED and SHIPPED cards."""
+    if not engine:
+        return templates.TemplateResponse(
+            "admin/cards.html",
+            {"request": request, "requests": [], "pending_count": 0}
+        )
+    
+    with engine.begin() as conn:
+        # Get all card requests (REQUESTED and SHIPPED status)
+        rows = conn.execute(text("""
+            SELECT 
+                dc.id,
+                dc.trucker_id,
+                dc.status,
+                dc.card_last_four,
+                dc.requested_at,
+                dc.shipped_at,
+                tp.mc_number,
+                tp.display_name,
+                tp.address_line1,
+                tp.address_line2,
+                tp.city,
+                tp.state,
+                tp.zip_code
+            FROM webwise.debit_cards dc
+            INNER JOIN webwise.trucker_profiles tp ON dc.trucker_id = tp.id
+            WHERE dc.status IN ('REQUESTED', 'SHIPPED')
+            ORDER BY 
+                CASE dc.status 
+                    WHEN 'REQUESTED' THEN 1 
+                    WHEN 'SHIPPED' THEN 2 
+                    ELSE 3 
+                END,
+                dc.requested_at DESC
+        """))
+        
+        requests = []
+        pending_count = 0
+        for row in rows:
+            if row.status == 'REQUESTED':
+                pending_count += 1
+            requests.append({
+                "id": row.id,
+                "trucker_id": row.trucker_id,
+                "status": row.status,
+                "card_last_four": row.card_last_four,
+                "requested_at": row.requested_at,
+                "shipped_at": row.shipped_at,
+                "trucker_mc": row.mc_number or "N/A",
+                "display_name": row.display_name or "Unknown",
+                "address_line1": row.address_line1,
+                "address_line2": row.address_line2,
+                "city": row.city,
+                "state": row.state,
+                "zip": row.zip_code
+            })
+    
+    return templates.TemplateResponse(
+        "admin/cards.html",
+        {"request": request, "requests": requests, "pending_count": pending_count}
+    )
+
+
+@router.post("/admin/cards/ship/{card_id}", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+async def ship_card(card_id: int, request: Request):
+    """Mark a card as shipped with last 4 digits."""
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    
+    form_data = await request.form()
+    last_four = form_data.get("last_four", "").strip()
+    
+    if not last_four or len(last_four) != 4 or not last_four.isdigit():
+        return HTMLResponse(
+            content='<td colspan="5" class="px-6 py-4 text-red-400">Invalid card number. Must be 4 digits.</td>',
+            status_code=400
+        )
+    
+    with engine.begin() as conn:
+        # Verify card exists and is in REQUESTED status
+        check = conn.execute(
+            text("SELECT trucker_id, status FROM webwise.debit_cards WHERE id = :card_id"),
+            {"card_id": card_id}
+        ).fetchone()
+        
+        if not check:
+            return HTMLResponse(
+                content='<td colspan="5" class="px-6 py-4 text-red-400">Card not found.</td>',
+                status_code=404
+            )
+        
+        if check.status != 'REQUESTED':
+            return HTMLResponse(
+                content=f'<td colspan="5" class="px-6 py-4 text-yellow-400">Card already {check.status.lower()}.</td>',
+                status_code=400
+            )
+        
+        trucker_id = check.trucker_id
+        
+        # Update card status
+        conn.execute(
+            text("""
+                UPDATE webwise.debit_cards 
+                SET status = 'SHIPPED',
+                    card_last_four = :last_four,
+                    shipped_at = now(),
+                    updated_at = now()
+                WHERE id = :card_id
+            """),
+            {"card_id": card_id, "last_four": last_four}
+        )
+        
+        # Create notification for driver
+        conn.execute(
+            text("""
+                INSERT INTO webwise.notifications (trucker_id, message, notif_type, is_read)
+                VALUES (:trucker_id, :message, 'SYSTEM_ALERT', false)
+            """),
+            {
+                "trucker_id": trucker_id,
+                "message": "📦 YOUR CARD IS ON THE WAY! Watch your mail for your GC Fuel & Fleet Card. You'll be able to activate it once it arrives.",
+            }
+        )
+        
+        # Get updated card info for display
+        updated = conn.execute(
+            text("""
+                SELECT 
+                    dc.id,
+                    dc.status,
+                    dc.card_last_four,
+                    dc.requested_at,
+                    tp.mc_number,
+                    tp.address_line1,
+                    tp.address_line2,
+                    tp.city,
+                    tp.state,
+                    tp.zip_code
+                FROM webwise.debit_cards dc
+                INNER JOIN webwise.trucker_profiles tp ON dc.trucker_id = tp.id
+                WHERE dc.id = :card_id
+            """),
+            {"card_id": card_id}
+        ).fetchone()
+        
+        # Return updated row HTML
+        return HTMLResponse(
+            content=f'''
+            <tr id="card-row-{updated.id}" class="bg-blue-900/20">
+                <td class="px-6 py-4 text-white font-mono">{updated.mc_number or 'N/A'}</td>
+                <td class="px-6 py-4 text-slate-400">
+                    {updated.address_line1 or ''}{f', {updated.address_line2}' if updated.address_line2 else ''}<br>
+                    {updated.city or ''}, {updated.state or ''} {updated.zip_code or ''}
+                </td>
+                <td class="px-6 py-4 text-slate-400">
+                    {updated.requested_at.strftime('%m/%d/%Y') if updated.requested_at else 'N/A'}
+                </td>
+                <td class="px-6 py-4">
+                    <span class="text-indigo-400 font-mono">{updated.card_last_four or 'N/A'}</span>
+                </td>
+                <td class="px-6 py-4 text-right">
+                    <span class="text-blue-400 text-xs font-bold">SHIPPED</span>
+                </td>
+            </tr>
+            ''',
+            headers={"HX-Trigger": "cardShipped"}
+        )

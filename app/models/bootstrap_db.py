@@ -145,9 +145,34 @@ def run_bootstrap():
                 carrier_name VARCHAR(200),
                 truck_identifier VARCHAR(80),
                 mc_number VARCHAR(50),
+                reward_tier VARCHAR(20) DEFAULT 'STANDARD',
                 created_at TIMESTAMP DEFAULT now(),
                 updated_at TIMESTAMP
             );
+        """))
+        # Add reward_tier column if it doesn't exist (for existing databases)
+        conn.execute(text("""
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'trucker_profiles' 
+                               AND column_name = 'reward_tier') THEN
+                    ALTER TABLE webwise.trucker_profiles ADD COLUMN reward_tier VARCHAR(20) DEFAULT 'STANDARD';
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'trucker_profiles' 
+                               AND column_name = 'authority_type') THEN
+                    ALTER TABLE webwise.trucker_profiles ADD COLUMN authority_type VARCHAR(10) DEFAULT 'MC';
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'trucker_profiles' 
+                               AND column_name = 'dot_number') THEN
+                    ALTER TABLE webwise.trucker_profiles ADD COLUMN dot_number VARCHAR(50);
+                END IF;
+            END $$;
         """))
         conn.execute(text("""
             DO $$ BEGIN
@@ -185,6 +210,19 @@ def run_bootstrap():
             CREATE INDEX IF NOT EXISTS idx_loads_ref_id ON webwise.loads(ref_id);
             CREATE INDEX IF NOT EXISTS idx_loads_status ON webwise.loads(status);
         """))
+        # Add discovered_by_id column if it doesn't exist
+        conn.execute(text("""
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'loads' 
+                               AND column_name = 'discovered_by_id') THEN
+                    ALTER TABLE webwise.loads ADD COLUMN discovered_by_id INTEGER REFERENCES webwise.trucker_profiles(id);
+                    CREATE INDEX IF NOT EXISTS idx_loads_discovered_by ON webwise.loads(discovered_by_id);
+                END IF;
+            END $$;
+        """))
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS webwise.driver_savings_ledger (
                 id SERIAL PRIMARY KEY,
@@ -215,6 +253,109 @@ def run_bootstrap():
         """))
         conn.execute(text("""
             CREATE INDEX IF NOT EXISTS idx_driver_mc ON webwise.driver_savings_ledger(driver_mc_number);
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.claim_requests (
+                id SERIAL PRIMARY KEY,
+                trucker_id INTEGER NOT NULL REFERENCES webwise.trucker_profiles(id),
+                amount_candle DECIMAL(18, 4) NOT NULL,
+                wallet_address VARCHAR(255) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                tx_hash VARCHAR(66),
+                requested_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+                approved_at TIMESTAMP WITH TIME ZONE,
+                paid_at TIMESTAMP WITH TIME ZONE
+            );
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_claim_requests_trucker ON webwise.claim_requests(trucker_id);
+            CREATE INDEX IF NOT EXISTS idx_claim_requests_status ON webwise.claim_requests(status);
+        """))
+        
+        # Debit Cards table
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.debit_cards (
+                id SERIAL PRIMARY KEY,
+                trucker_id INTEGER NOT NULL UNIQUE REFERENCES webwise.trucker_profiles(id),
+                status VARCHAR(20) DEFAULT 'NOT_STARTED' NOT NULL,
+                card_last_four VARCHAR(4),
+                current_balance_usd DECIMAL(10, 2) DEFAULT 0.0,
+                requested_at TIMESTAMP WITH TIME ZONE,
+                shipped_at TIMESTAMP WITH TIME ZONE,
+                activated_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE
+            );
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_debit_cards_trucker ON webwise.debit_cards(trucker_id);
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_debit_cards_status ON webwise.debit_cards(status);
+        """))
+        
+        # Debit Card Transactions table
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.debit_card_transactions (
+                id SERIAL PRIMARY KEY,
+                debit_card_id INTEGER NOT NULL REFERENCES webwise.debit_cards(id),
+                trucker_id INTEGER NOT NULL REFERENCES webwise.trucker_profiles(id),
+                transaction_type VARCHAR(20) NOT NULL,  -- 'LOAD', 'SPEND', 'REFUND'
+                token_amount DECIMAL(18, 4) NOT NULL,  -- Amount in $CANDLE tokens
+                usd_amount DECIMAL(10, 2) NOT NULL,  -- Amount in USD
+                token_price DECIMAL(10, 6) NOT NULL,  -- Price per token at time of transfer
+                status VARCHAR(20) DEFAULT 'COMPLETED',  -- 'PENDING', 'COMPLETED', 'FAILED'
+                description TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_debit_card_transactions_card ON webwise.debit_card_transactions(debit_card_id);
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_debit_card_transactions_trucker ON webwise.debit_card_transactions(trucker_id);
+        """))
+        # Add wallet_address to trucker_profiles if it doesn't exist
+        conn.execute(text("""
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'trucker_profiles' 
+                               AND column_name = 'wallet_address') THEN
+                    ALTER TABLE webwise.trucker_profiles ADD COLUMN wallet_address VARCHAR(255);
+                END IF;
+            END $$;
+        """))
+        # Add shipping address fields to trucker_profiles if they don't exist
+        conn.execute(text("""
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'trucker_profiles' 
+                               AND column_name = 'address_line1') THEN
+                    ALTER TABLE webwise.trucker_profiles 
+                    ADD COLUMN address_line1 VARCHAR(255),
+                    ADD COLUMN address_line2 VARCHAR(255),
+                    ADD COLUMN city VARCHAR(100),
+                    ADD COLUMN state VARCHAR(50),
+                    ADD COLUMN zip_code VARCHAR(20);
+                END IF;
+            END $$;
+        """))
+        # Add API key for Scout Extension authentication
+        conn.execute(text("""
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'trucker_profiles' 
+                               AND column_name = 'scout_api_key') THEN
+                    ALTER TABLE webwise.trucker_profiles ADD COLUMN scout_api_key VARCHAR(64) UNIQUE;
+                    CREATE INDEX IF NOT EXISTS idx_trucker_profiles_api_key ON webwise.trucker_profiles(scout_api_key);
+                END IF;
+            END $$;
         """))
         existing = conn.execute(text("SELECT COUNT(*) FROM webwise.projects;")).scalar()
         if existing == 0:

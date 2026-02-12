@@ -1,0 +1,136 @@
+{% extends "layout/dashboard_base.html" %}
+
+{% block dashboard_content %}
+<div class="space-y-6">
+    
+    <div class="flex justify-between items-end">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Fleet Builder</h1>
+            <p class="text-slate-400">Build your own digital fleet. Earn <span class="text-green-400 font-bold">{{ "{:,.0f}".format(referral_token_amount) }} $CANDLE/month</span> (~${{ referral_reward_usd | int }}) for every active truck you refer.</p>
+            <p class="text-[10px] text-slate-500 mt-1">💡 Paid in $CANDLE tokens—your stake in the network grows with every referral.</p>
+        </div>
+        <div class="bg-green-900/20 border border-green-500/30 px-4 py-2 rounded-lg text-right">
+            <p class="text-xs text-green-400 uppercase font-bold">Monthly Passive Income</p>
+            <p class="text-2xl font-black text-green-400">{{ "{:,.0f}".format(monthly_earnings_candle or 0) }} <span class="text-xs text-green-600">$CANDLE</span></p>
+            <p class="text-[10px] text-slate-500 mt-1">~${{ "{:,.2f}".format(monthly_earnings or 0) }}</p>
+            <p class="text-[9px] text-slate-600 mt-1">@ ${{ "{:.4f}".format(token_price) }}/token</p>
+        </div>
+    </div>
+
+    <div class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-lg">
+        <label class="block text-sm font-medium text-slate-300 mb-2">Your Referral Link</label>
+        <div class="flex gap-2">
+            <input type="text" readonly value="https://greencandledispatch.com/register?ref={{ user.referral_code }}" 
+                class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white font-mono text-sm focus:ring-green-500 focus:border-green-500" id="refLink">
+            <button onclick="copyLink()" class="bg-green-500 hover:bg-green-400 text-slate-900 font-bold px-6 rounded-lg transition">
+                Copy
+            </button>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">
+            Share this link with other drivers. When they sign up and start factoring, you earn <span class="text-green-400 font-bold">{{ "{:,.0f}".format(referral_token_amount) }} $CANDLE/month</span> per active referral.
+        </p>
+        <div class="mt-3 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+            <p class="text-[10px] text-green-300 font-bold mb-1">💡 Why $CANDLE instead of cash?</p>
+            <p class="text-[10px] text-slate-400">Your referral rewards are paid in $CANDLE tokens. As the network grows and token value increases, your past referrals become more valuable. It's not just a fee—it's a stake in the fleet.</p>
+        </div>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6">
+        <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl">
+            <div class="text-3xl mb-2">☕</div>
+            <h3 class="text-white font-bold text-lg">Coffee Tier</h3>
+            <p class="text-slate-400 text-sm mb-4">Earn ~${{ referral_reward_usd | int }}.00 in $CANDLE every month.</p>
+            <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-black text-green-400">{{ "{:,.0f}".format(referral_token_amount) }}</span>
+                <span class="text-xs text-green-600 font-bold">$CANDLE /mo</span>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-2">≈ ${{ referral_reward_usd | int }} USD</p>
+        </div>
+        <div class="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-xl">
+            <div class="text-3xl mb-2">⛽</div>
+            <h3 class="text-white font-bold text-lg">Fuel Tier</h3>
+            <p class="text-slate-400 text-sm mb-4">Earn ~${{ (referral_reward_usd * 5) | int }}.00 in $CANDLE every month.</p>
+            <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-black text-green-400">{{ "{:,.0f}".format(referral_token_amount * 5) }}</span>
+                <span class="text-xs text-green-600 font-bold">$CANDLE /mo</span>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-2">≈ ${{ (referral_reward_usd * 5) | int }} USD</p>
+        </div>
+        <div class="bg-slate-900 p-6 rounded-xl border border-green-500/30 shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-24 h-24 bg-green-500/10 rounded-full blur-xl"></div>
+            <div class="text-3xl mb-2">🏦</div>
+            <h3 class="text-white font-bold text-lg">Retirement Tier</h3>
+            <p class="text-slate-400 text-sm mb-4">Earn ~${{ (referral_reward_usd * 10) | int }}.00 in $CANDLE every month.</p>
+            <div class="flex items-baseline gap-2">
+                <span class="text-3xl font-black text-green-400">{{ "{:,.0f}".format(referral_token_amount * 10) }}</span>
+                <span class="text-xs text-green-600 font-bold">$CANDLE /mo</span>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-2">≈ ${{ (referral_reward_usd * 10) | int }} USD</p>
+            <div class="mt-3 pt-3 border-t border-green-500/20">
+                <p class="text-[9px] text-green-400 font-bold">💎 Moon Potential: If $CANDLE 2x, this becomes ${{ (referral_reward_usd * 10 * 2) | int }}/mo</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-700">
+            <h3 class="font-bold text-white">Your Recruits</h3>
+        </div>
+        <table class="w-full text-left">
+            <thead class="bg-slate-900 text-xs text-slate-400 uppercase">
+                <tr>
+                    <th class="px-6 py-3">Driver</th>
+                    <th class="px-6 py-3">Join Date</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3 text-right">Monthly Reward</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-700 text-sm">
+                {% for referral in referrals %}
+                <tr>
+                    <td class="px-6 py-4 text-white font-mono">{{ referral.mc_number }}</td>
+                    <td class="px-6 py-4 text-slate-400">{{ referral.created_at.strftime('%b %d, %Y') }}</td>
+                    <td class="px-6 py-4">
+                        {% if referral.factoring_status == 'ACTIVE' %}
+                            <span class="bg-green-900/30 text-green-400 px-2 py-1 rounded-full text-xs font-bold">Active</span>
+                        {% else %}
+                            <span class="bg-yellow-900/30 text-yellow-400 px-2 py-1 rounded-full text-xs font-bold">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        {% if referral.factoring_status == 'ACTIVE' %}
+                            <div class="flex flex-col items-end">
+                                <span class="font-black text-green-400 text-lg">{{ "{:,.0f}".format(referral_token_amount) }}</span>
+                                <span class="text-xs text-green-600 font-bold">$CANDLE</span>
+                                <span class="text-[10px] text-slate-500">≈ ${{ referral_reward_usd | int }} USD</span>
+                            </div>
+                        {% else %}
+                            <div class="flex flex-col items-end">
+                                <span class="text-slate-500 text-sm">0</span>
+                                <span class="text-xs text-slate-600">$CANDLE</span>
+                            </div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="px-6 py-8 text-center text-slate-500">
+                        You haven't referred anyone yet. Share your link above!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function copyLink() {
+        var copyText = document.getElementById("refLink");
+        copyText.select();
+        copyText.setSelectionRange(0, 99999); 
+        navigator.clipboard.writeText(copyText.value);
+        alert("Link copied to clipboard: " + copyText.value);
+    }
+</script>
+{% endblock %}

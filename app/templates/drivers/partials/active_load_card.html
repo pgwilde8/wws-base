@@ -1,0 +1,20 @@
+<div class="bg-gradient-to-br from-green-900/40 to-slate-900 rounded-xl border-l-4 border-green-500 p-4 shadow-xl">
+    <div class="flex justify-between items-start mb-3">
+        <span class="bg-green-500 text-black text-[10px] font-black px-2 py-0.5 rounded">IN PROGRESS</span>
+        <span class="text-white font-mono text-sm">${{ "{:,.2f}".format(load.final_rate) }}</span>
+    </div>
+    <div class="flex items-center gap-4">
+        <div class="text-center">
+            <div class="text-[10px] text-slate-500 uppercase">Origin</div>
+            <div class="text-sm font-bold text-white">{{ load.origin }}</div>
+        </div>
+        <i class="fas fa-arrow-right text-slate-700 text-xs"></i>
+        <div class="text-center">
+            <div class="text-[10px] text-slate-500 uppercase">Dest</div>
+            <div class="text-sm font-bold text-white">{{ load.destination }}</div>
+        </div>
+    </div>
+    <button class="w-full mt-4 bg-slate-800 text-white text-xs font-bold py-2 rounded border border-slate-700 hover:bg-slate-700 transition">
+        View Bill of Lading
+    </button>
+</div>

@@ -15,9 +15,43 @@
       <input type="text" name="carrier_name" required class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white" placeholder="Your company or fleet name">
     </div>
     <div>
-      <label class="text-xs font-bold text-green-400 uppercase">MC Number</label>
-      <input type="text" name="mc_number" required placeholder="MC-123456" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white">
+      <label class="text-xs font-bold text-green-400 uppercase mb-2 block">Authority Type</label>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <label class="cursor-pointer">
+          <input type="radio" name="authority_type" value="MC" checked class="peer sr-only" onchange="toggleAuthorityType('MC')">
+          <div class="rounded-xl border border-gray-700 bg-gray-900 p-3 text-center transition peer-checked:border-green-500 peer-checked:bg-green-900/20">
+            <span class="text-sm font-medium text-gray-300 peer-checked:text-green-400">MC Number</span>
+          </div>
+        </label>
+        <label class="cursor-pointer">
+          <input type="radio" name="authority_type" value="DOT" class="peer sr-only" onchange="toggleAuthorityType('DOT')">
+          <div class="rounded-xl border border-gray-700 bg-gray-900 p-3 text-center transition peer-checked:border-green-500 peer-checked:bg-green-900/20">
+            <span class="text-sm font-medium text-gray-300 peer-checked:text-green-400">DOT Number</span>
+          </div>
+        </label>
+      </div>
+      <input type="text" name="mc_number" id="mc_number_input" placeholder="MC-123456" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white">
+      <input type="text" name="dot_number" id="dot_number_input" placeholder="DOT-1234567" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white hidden">
     </div>
+    <script>
+      function toggleAuthorityType(type) {
+        const mcInput = document.getElementById('mc_number_input');
+        const dotInput = document.getElementById('dot_number_input');
+        if (type === 'MC') {
+          mcInput.classList.remove('hidden');
+          mcInput.required = true;
+          dotInput.classList.add('hidden');
+          dotInput.required = false;
+        } else {
+          mcInput.classList.add('hidden');
+          mcInput.required = false;
+          dotInput.classList.remove('hidden');
+          dotInput.required = true;
+        }
+      }
+      // Initialize on page load
+      document.addEventListener('DOMContentLoaded', () => toggleAuthorityType('MC'));
+    </script>
     <div>
       <label class="text-xs font-bold text-gray-400 uppercase">Your Name</label>
       <input type="text" name="display_name" required class="w-full bg-gray-900 border border-gray-700 p-3 rounded-xl text-white" placeholder="How we'll address you">

@@ -67,7 +67,7 @@ def auth_client(request: Request, email: str = Form(...), password: str = Form(.
         )
 
     session_token = sign_session({"uid": user["id"], "role": user["role"], "email": user["email"]})
-    response = RedirectResponse(url="/clients/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse(url="/savings-view", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         SESSION_COOKIE, session_token, httponly=True, secure=False, samesite="lax", max_age=SESSION_TTL_SECONDS
     )
@@ -94,7 +94,9 @@ def register_trucker(
     email: str = Form(...),
     password: str = Form(...),
     display_name: str = Form(...),
-    mc_number: str = Form(...),
+    mc_number: str = Form(""),
+    dot_number: str = Form(""),
+    authority_type: str = Form("MC"),  # "MC" or "DOT"
     carrier_name: str = Form(...),
     truck_identifier: str = Form(""),
     # NEW FORM INPUTS FOR FACTORING:
@@ -164,20 +166,43 @@ def register_trucker(
         row = r.one()
         user_id = row.id
         
+        # Validate that at least one identifier is provided
+        mc_clean = mc_number.strip() if mc_number else ""
+        dot_clean = dot_number.strip() if dot_number else ""
+        auth_type = authority_type.strip().upper() if authority_type else "MC"
+        
+        if auth_type not in ["MC", "DOT"]:
+            auth_type = "MC"
+        
+        if auth_type == "MC" and not mc_clean:
+            return templates.TemplateResponse(
+                "auth/register-trucker.html",
+                {"request": request, "error": "MC Number is required when MC is selected."},
+            )
+        if auth_type == "DOT" and not dot_clean:
+            return templates.TemplateResponse(
+                "auth/register-trucker.html",
+                {"request": request, "error": "DOT Number is required when DOT is selected."},
+            )
+        
         # Insert trucker profile
         conn.execute(
             text("""
                 INSERT INTO webwise.trucker_profiles (
                     user_id, 
                     display_name, 
-                    mc_number, 
+                    mc_number,
+                    dot_number,
+                    authority_type,
                     carrier_name, 
                     truck_identifier
                 )
                 VALUES (
                     :user_id, 
                     :display_name, 
-                    :mc_number, 
+                    :mc_number,
+                    :dot_number,
+                    :authority_type,
                     :carrier_name, 
                     :truck_identifier
                 )
@@ -185,7 +210,9 @@ def register_trucker(
             {
                 "user_id": user_id,
                 "display_name": display_name.strip(),
-                "mc_number": mc_number.strip(),
+                "mc_number": mc_clean or None,
+                "dot_number": dot_clean or None,
+                "authority_type": auth_type,
                 "carrier_name": carrier_name.strip(),
                 "truck_identifier": (truck_identifier or "").strip() or None,
             },
@@ -193,7 +220,8 @@ def register_trucker(
     
     # Log referral status for admin tracking
     if referral_status == "OTR_REQUESTED":
-        print(f"💰 REFERRAL ALERT: {email} ({mc_number}) requested OTR referral!")
+        identifier = f"{auth_type}: {dot_clean if auth_type == 'DOT' else mc_clean}"
+        print(f"💰 REFERRAL ALERT: {email} ({identifier}) requested OTR referral!")
     
     # Send welcome email to new beta driver (non-blocking)
     try:
@@ -209,7 +237,7 @@ def register_trucker(
         print(f"⚠️  Welcome email failed (non-blocking): {e}")
     
     session_token = sign_session({"uid": user_id, "role": "client", "email": email.strip().lower()})
-    response = RedirectResponse(url="/clients/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse(url="/savings-view", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         SESSION_COOKIE, session_token, httponly=True, secure=False, samesite="lax", max_age=SESSION_TTL_SECONDS
     )

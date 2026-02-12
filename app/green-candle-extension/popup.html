@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            width: 300px;
+            background: #0f172a;
+            color: white;
+            font-family: sans-serif;
+            padding: 15px;
+            margin: 0;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .header h3 {
+            margin: 0;
+            color: #22c55e;
+            font-size: 16px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .status-indicator.connected {
+            background: #22c55e;
+            box-shadow: 0 0 8px #22c55e;
+        }
+        .status-indicator.disconnected {
+            background: #64748b;
+        }
+        .api-key-section {
+            margin-bottom: 15px;
+        }
+        .api-key-section label {
+            display: block;
+            font-size: 10px;
+            color: #94a3b8;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .api-key-section input {
+            width: 100%;
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: white;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-family: monospace;
+            box-sizing: border-box;
+        }
+        .api-key-section input:focus {
+            outline: none;
+            border-color: #22c55e;
+        }
+        button {
+            width: 100%;
+            background: #22c55e;
+            color: #0f172a;
+            border: none;
+            padding: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #4ade80;
+        }
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        #status {
+            font-size: 11px;
+            margin-top: 10px;
+            text-align: center;
+            color: #94a3b8;
+            min-height: 30px;
+        }
+        .status-success {
+            color: #22c55e;
+        }
+        .status-error {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h3>🕯️ Green Candle Scout</h3>
+        <div id="connectionStatus" style="font-size: 10px; color: #64748b;">
+            <span class="status-indicator disconnected"></span>Checking...
+        </div>
+    </div>
+    
+    <div class="api-key-section">
+        <label>API Key</label>
+        <input type="text" id="apiKeyInput" placeholder="Paste your API key here">
+    </div>
+    
+    <button id="saveBtn">SAVE API KEY</button>
+    <button id="scrapeBtn" disabled>SCRAPE PAGE</button>
+    
+    <div id="status">Configure API key to start</div>
+    <script src="popup.js"></script>
+</body>
+</html>
