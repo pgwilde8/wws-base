@@ -22,6 +22,7 @@ class TruckerProfile(Base):
     authority_type = Column(String(10), default="MC")      # 'MC' or 'DOT' - which identifier is primary
     reward_tier = Column(String(20), default="STANDARD")     # 'STANDARD' (75/25) or 'INCENTIVE' (90/10)
     wallet_address = Column(String(255), nullable=True)     # Solana/Ethereum wallet for token claims
+    scout_api_key = Column(String(64), unique=True, nullable=True, index=True)  # API key for Scout extension
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

@@ -8,6 +8,9 @@ from sqlalchemy.sql import func
 
 from .bootstrap_db import Base
 
+# Ensure TruckerProfile table is in metadata so FK("webwise.trucker_profiles.id") resolves
+from . import trucker_profile  # noqa: F401
+
 
 class Load(Base):
     """Raw load data from load boards (DAT, Truckstop, etc.)"""
