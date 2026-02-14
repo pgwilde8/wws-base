@@ -579,6 +579,57 @@ def view_leads_dashboard(request: Request):
     )
 
 
+@router.get("/admin/broker", dependencies=[Depends(require_admin)])
+def broker_lookup(request: Request, mc: str | None = None):
+    """Lookup broker by MC number. Shows all contact info and emails."""
+    broker = None
+    emails = []
+    error = None
+    mc_clean = None
+
+    if mc:
+        mc_clean = "".join(c for c in str(mc).strip() if c.isdigit())
+        if not mc_clean:
+            error = "Please enter a valid MC number (digits only)."
+        elif not engine:
+            error = "Database not configured."
+        else:
+            with engine.begin() as conn:
+                row = conn.execute(
+                    text("""
+                        SELECT mc_number, dot_number, company_name, dba_name, website,
+                               primary_email, primary_phone, secondary_phone, fax,
+                               phy_street, phy_city, phy_state, phy_zip,
+                               source, preferred_contact_method, created_at, updated_at
+                        FROM webwise.brokers WHERE mc_number = :mc
+                    """),
+                    {"mc": mc_clean},
+                ).fetchone()
+                if row:
+                    broker = dict(row._mapping)
+                    em_rows = conn.execute(
+                        text("""
+                            SELECT email, source, confidence, evidence
+                            FROM webwise.broker_emails WHERE mc_number = :mc
+                            ORDER BY confidence DESC
+                        """),
+                        {"mc": mc_clean},
+                    )
+                    emails = [dict(r._mapping) for r in em_rows]
+
+    return templates.TemplateResponse(
+        "admin/broker.html",
+        {
+            "request": request,
+            "mc": mc.strip() if mc else None,
+            "mc_clean": mc_clean,
+            "broker": broker,
+            "emails": emails,
+            "error": error,
+        },
+    )
+
+
 @router.get("/admin/cards", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
 def card_fulfillment_queue(request: Request):
     """Admin view: Card fulfillment queue showing REQUESTED and SHIPPED cards."""
