@@ -39,7 +39,6 @@ def get_trucker_by_api_key(api_key: Optional[str]) -> Optional[int]:
         logger.error(f"Error looking up API key: {e}")
         return None
 
-
 @router.post("/loads", status_code=200)
 def ingest_loads(
     loads: List[LoadCreate], 

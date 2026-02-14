@@ -42,6 +42,7 @@ class LoadIngestionBase(BaseModel):
     price: str
     equipment_type: str
     pickup_date: Optional[str] = None
+    load_source: Optional[str] = None  # e.g., 'trucksmarter', 'dat', 'truckstop'
 
 
 class LoadCreate(LoadIngestionBase):

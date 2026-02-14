@@ -3,6 +3,7 @@ Email service for sending negotiation emails and receiving broker replies.
 Uses mxroute SMTP for sending, and can parse incoming replies to update negotiation status.
 """
 import os
+import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -18,15 +19,67 @@ MXROUTE_SMTP_PASSWORD = os.getenv("MXROUTE_SMTP_PASSWORD")
 MXROUTE_FROM_EMAIL = os.getenv("MXROUTE_FROM_EMAIL", MXROUTE_SMTP_USER or "noreply@greencandledispatch.com")
 
 
+def add_load_board_tag(email: str, load_source: Optional[str] = None) -> str:
+    """
+    Add plus-addressing tag to broker email based on load source.
+    
+    Examples:
+    - email='gcs_parade@geodis.com', load_source='trucksmarter' → 'gcs_parade+trucksmarter@geodis.com'
+    - email='gcs_parade+trucksmarter@geodis.com', load_source='dat' → 'gcs_parade+dat@geodis.com' (replaces tag)
+    - email='gcs_parade@geodis.com', load_source=None → 'gcs_parade@geodis.com' (no tag)
+    
+    Common load board tags:
+    - trucksmarter → +trucksmarter
+    - dat → +dat
+    - truckstop → +truckstop
+    - 123loadboard → +123loadboard
+    - centraldispatch → +centraldispatch
+    """
+    if not load_source:
+        # If no source, return clean base (strip any existing tag)
+        if "+" in email and "@" in email:
+            local, domain = email.rsplit("@", 1)
+            base_local = local.split("+", 1)[0]
+            return f"{base_local}@{domain}"
+        return email
+    
+    # Normalize load_source to tag format (lowercase, no spaces/special chars)
+    tag = re.sub(r"[^a-z0-9]", "", load_source.lower())
+    if not tag:
+        return email
+    
+    # Extract base email (remove existing tag if present)
+    if "+" in email and "@" in email:
+        local, domain = email.rsplit("@", 1)
+        base_local = local.split("+", 1)[0]
+    elif "@" in email:
+        base_local, domain = email.rsplit("@", 1)
+    else:
+        return email  # Invalid email format
+    
+    # Add new tag
+    return f"{base_local}+{tag}@{domain}"
+
+
 def send_negotiation_email(
     to_email: str,
     subject: str,
     body: str,
     load_id: str,
-    negotiation_id: int
+    negotiation_id: int,
+    load_source: Optional[str] = None
 ) -> Dict[str, any]:
     """
     Send a negotiation email to a broker via mxroute SMTP.
+    
+    Args:
+        to_email: Broker's primary_email (will be tagged based on load_source)
+        subject: Email subject line
+        body: Email body text
+        load_id: Load identifier for tracking
+        negotiation_id: Negotiation ID for tracking
+        load_source: Load board source (e.g., 'trucksmarter', 'dat') - adds +tag to email
+    
     Returns status dict with success/error info.
     """
     if not MXROUTE_SMTP_USER or not MXROUTE_SMTP_PASSWORD:
@@ -36,10 +89,13 @@ def send_negotiation_email(
         }
     
     try:
+        # Add load board tag to email address
+        tagged_email = add_load_board_tag(to_email, load_source)
+        
         # Create message
         msg = MIMEMultipart()
         msg['From'] = MXROUTE_FROM_EMAIL
-        msg['To'] = to_email
+        msg['To'] = tagged_email
         msg['Subject'] = subject
         msg['Reply-To'] = MXROUTE_FROM_EMAIL  # Replies come back to your inbox
         
@@ -65,7 +121,10 @@ Negotiation ID: {negotiation_id}
         
         return {
             "status": "success",
-            "message": f"Email sent to {to_email}",
+            "message": f"Email sent to {tagged_email}",
+            "original_email": to_email,
+            "tagged_email": tagged_email,
+            "load_source": load_source,
             "sent_at": datetime.now().isoformat()
         }
     

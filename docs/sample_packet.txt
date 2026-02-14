@@ -1,0 +1,10 @@
+Carrier Packet – Setup Information
+
+Company: Greatwide Dedicated Transport III LLC
+MC # 199051  |  USDOT 123456
+
+Dispatch / Operations:
+  dispatch@example.com
+  loads@example.com
+
+Contact: bhotchkiss@cardlog.com

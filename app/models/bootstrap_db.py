@@ -357,6 +357,48 @@ def run_bootstrap():
                 END IF;
             END $$;
         """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.brokers (
+                mc_number VARCHAR(20) PRIMARY KEY,
+                dot_number VARCHAR(20),
+                company_name VARCHAR(255),
+                dba_name VARCHAR(255),
+                website VARCHAR(255),
+                primary_email VARCHAR(255),
+                primary_phone VARCHAR(50),
+                fax VARCHAR(50),
+                phy_street VARCHAR(255),
+                phy_city VARCHAR(100),
+                phy_state VARCHAR(50),
+                phy_zip VARCHAR(20),
+                rating DECIMAL(3,2),
+                source VARCHAR(50) DEFAULT 'FMCSA',
+                preferred_contact_method VARCHAR(20) DEFAULT 'email',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP
+            );
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_brokers_primary_email ON webwise.brokers(primary_email);
+        """))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.broker_emails (
+                id BIGSERIAL PRIMARY KEY,
+                mc_number VARCHAR(20) NOT NULL REFERENCES webwise.brokers(mc_number) ON DELETE CASCADE,
+                email TEXT NOT NULL,
+                source TEXT NOT NULL,
+                confidence NUMERIC(4,3) NOT NULL DEFAULT 0.300,
+                evidence TEXT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                UNIQUE (mc_number, email)
+            );
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_broker_emails_mc ON webwise.broker_emails(mc_number);
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_broker_emails_email ON webwise.broker_emails(email);
+        """))
         existing = conn.execute(text("SELECT COUNT(*) FROM webwise.projects;")).scalar()
         if existing == 0:
             conn.execute(text("""
