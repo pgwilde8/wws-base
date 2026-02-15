@@ -1,0 +1,95 @@
+<div id="help-drawer" class="fixed inset-y-0 right-0 w-80 max-w-[90vw] bg-slate-900 border-l border-slate-800 shadow-2xl z-[100] transform translate-x-full transition-transform duration-300">
+    <div class="p-6 h-full flex flex-col">
+        <div class="flex justify-between items-center mb-8">
+            <h3 class="text-white font-bold tracking-tight">Resource Center</h3>
+            <button type="button" onclick="document.getElementById('help-drawer').classList.add('translate-x-full')" class="text-slate-500 hover:text-white transition" aria-label="Close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto space-y-6 pr-2">
+            <div>
+                <h4 class="text-xs font-black text-blue-500 uppercase tracking-widest mb-3">The $CANDLE Economy</h4>
+                <div class="space-y-4">
+                    <details class="group border-b border-slate-800 pb-3">
+                        <summary class="text-xs text-slate-300 font-bold cursor-pointer list-none flex justify-between items-center gap-2">
+                            My tank is at 0.0. How do I refill?
+                            <i class="fas fa-plus text-xs shrink-0 group-open:rotate-45 transition-transform"></i>
+                        </summary>
+                        <div class="mt-3 space-y-3 text-xs text-slate-500 leading-relaxed">
+                            <p>There are two ways to fuel your AI Scout:</p>
+                            <div class="bg-black/40 p-3 rounded-lg border border-slate-800">
+                                <p class="text-blue-400 font-bold mb-1">1. Auto-Refill (Professional Path)</p>
+                                <p>When you book a load through GC Dispatch and factor it, <strong class="text-slate-400">21% of our 2% service fee</strong> is converted to $CANDLE and dropped into your tank.</p>
+                                <p class="mt-2 text-slate-400">Example: A $2,000 load generates a $40 fee. We give $8.40 back as <strong class="text-blue-400">8.4 $CANDLE</strong>. Automation stays virtually free as long as you're hauling.</p>
+                            </div>
+                            <div class="bg-black/40 p-3 rounded-lg border border-slate-800">
+                                <p class="text-blue-400 font-bold mb-1">2. Manual Top-Up (Rapid Path)</p>
+                                <p>Purchase fuel packs directly:</p>
+                                <ul class="mt-2 space-y-1 text-slate-400">
+                                    <li>Starter Cell: 10.0 $CANDLE ($19)</li>
+                                    <li>Fleet Cell: 60.0 $CANDLE ($99) — Best Value</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="group border-b border-slate-800 pb-3">
+                        <summary class="text-xs text-slate-300 font-bold cursor-pointer list-none flex justify-between items-center gap-2">
+                            How do I refill for free?
+                            <i class="fas fa-plus text-xs shrink-0 group-open:rotate-45 transition-transform"></i>
+                        </summary>
+                        <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                            Factor your loads through us! We kick back 21% of our dispatch fee directly into your fuel tank as $CANDLE.
+                        </p>
+                    </details>
+
+                    <details class="group border-b border-slate-800 pb-3">
+                        <summary class="text-xs text-slate-300 font-bold cursor-pointer list-none flex justify-between items-center gap-2">
+                            Can I buy extra fuel?
+                            <i class="fas fa-plus text-xs shrink-0 group-open:rotate-45 transition-transform"></i>
+                        </summary>
+                        <div class="mt-2">
+                            <p class="text-xs text-slate-500 mb-3 leading-relaxed">Need more outreach power? Purchase a manual top-up.</p>
+                            <a href="/drivers/buy-fuel" class="block w-full bg-blue-600/20 text-blue-400 text-xs font-bold py-2 rounded-lg border border-blue-500/30 hover:bg-blue-600 hover:text-white transition text-center">
+                                Buy 10.0 $CANDLE ($19)
+                            </a>
+                            <a href="/drivers/buy-fuel?pack=fleet" class="block w-full mt-2 bg-slate-800 text-slate-300 text-xs font-bold py-2 rounded-lg border border-slate-700 hover:bg-slate-700 transition text-center">
+                                Buy 60.0 $CANDLE ($99) — Best Value
+                            </a>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Scout Chrome Extension</h4>
+                <div class="bg-black/40 p-3 rounded-xl border border-slate-800">
+                    <p class="text-xs text-slate-400 leading-relaxed">If Scout isn't appearing on DAT/Truckstop, ensure you're logged into the extension with your API Key:</p>
+                    <p class="mt-2 font-mono text-xs text-blue-400 break-all">{{ scout_api_key_display or "Not configured — get one in Settings" }}</p>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Negotiation Tactics</h4>
+                <div class="space-y-3 text-xs text-slate-500">
+                    <div class="bg-black/40 p-3 rounded-xl border border-slate-800">
+                        <p class="font-bold text-slate-400 mb-1">Force Call (0.5 $CANDLE)</p>
+                        <p>Use when the broker is slow to email or you need urgency. Triggers an AI phone call to the broker.</p>
+                    </div>
+                    <div class="bg-black/40 p-3 rounded-xl border border-slate-800">
+                        <p class="font-bold text-slate-400 mb-1">Manual Counter</p>
+                        <p>Use when you want to tweak the AI's suggested rate or add custom notes. You control the exact offer.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-6 border-t border-slate-800">
+            <a href="mailto:support@gcdloads.com" class="block w-full bg-slate-800 text-white text-xs font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-700 transition">
+                <i class="fas fa-headset text-blue-500"></i>
+                Live Tech Support
+            </a>
+        </div>
+    </div>
+</div>

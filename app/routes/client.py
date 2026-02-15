@@ -43,7 +43,7 @@ def dashboard2(request: Request, user: Optional[Dict] = Depends(current_user)):
     with engine.begin() as conn:
         row = conn.execute(
             text("""
-                SELECT tp.id, tp.display_name, tp.mc_number
+                SELECT tp.id, tp.display_name, tp.mc_number, tp.scout_api_key
                 FROM webwise.trucker_profiles tp
                 WHERE tp.user_id = :uid
             """),
@@ -51,6 +51,12 @@ def dashboard2(request: Request, user: Optional[Dict] = Depends(current_user)):
         ).first()
     if not row:
         return RedirectResponse(url="/drivers/onboarding", status_code=303)
+    api_key_raw = row[3] if len(row) > 3 else None
+    api_key_display = None
+    if api_key_raw and len(api_key_raw) >= 8:
+        api_key_display = f"{api_key_raw[:8]}...{api_key_raw[-4:]}" if len(api_key_raw) > 12 else api_key_raw[:8] + "..."
+    elif api_key_raw:
+        api_key_display = api_key_raw[:4] + "..."
     trucker = {"id": row[0], "display_name": row[1] or "Driver", "mc_number": row[2] or "—"}
     balance = VestingService.get_claimable_balance(engine, trucker["id"])
     balance_val = balance or 0
@@ -65,7 +71,13 @@ def dashboard2(request: Request, user: Optional[Dict] = Depends(current_user)):
             is_new_driver = (neg_count or 0) == 0
     return templates.TemplateResponse(
         "drivers/dashboard2.html",
-        {"request": request, "trucker": trucker, "balance": balance_val, "is_new_driver": is_new_driver},
+        {
+            "request": request,
+            "trucker": trucker,
+            "balance": balance_val,
+            "is_new_driver": is_new_driver,
+            "scout_api_key_display": api_key_display,
+        },
     )
 
 
@@ -249,6 +261,18 @@ def _dashboard_active_loads_empty(request: Request, balance: float = 10.0) -> HT
     return templates.TemplateResponse(
         "drivers/partials/dashboard_active_loads_empty.html",
         {"request": request, "balance": balance},
+    )
+
+
+@router.get("/drivers/buy-fuel", response_class=HTMLResponse)
+def buy_fuel(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Placeholder for Manual Top-Up (Stripe checkout). Pack: starter (10 $CANDLE) or fleet (60 $CANDLE)."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    pack = request.query_params.get("pack", "starter")
+    return templates.TemplateResponse(
+        "drivers/buy_fuel.html",
+        {"request": request, "pack": pack},
     )
 
 
