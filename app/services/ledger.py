@@ -120,7 +120,108 @@ def issue_service_credits(engine, trucker_id: int, load_id: str, total_paid: flo
     return issue_load_credits(engine, trucker_id, load_id, total_paid)
 
 
-# Premium feature costs (CANDLE)
-AUTOPILOT_COST = 3.0  # Charged only when load is successfully BOOKED
-OUTBOUND_EMAIL_COST = 0.1  # Per send from Terminal
-AI_VOICE_CALL_COST = 0.5  # Per escalation attempt
+# --- USAGE MENU: $CANDLE cost per action (Revenue Model Page 12-13) ---
+USAGE_RATES = {
+    "AUTO_BOOKING": 3.0,      # Rate Confirmation detected (idempotent per load)
+    "MANUAL_EMAIL": 0.1,      # Driver sends Counter / Counter-to-Market
+    "VOICE_ESCALATION": 0.5,  # Driver escalates to AI phone call
+    "DOC_PARSE": 1.0,         # AI parses BOL/Invoice
+}
+AUTOPILOT_COST = USAGE_RATES["AUTO_BOOKING"]
+OUTBOUND_EMAIL_COST = USAGE_RATES["MANUAL_EMAIL"]
+AI_VOICE_CALL_COST = USAGE_RATES["VOICE_ESCALATION"]
+
+
+def record_usage(engine, trucker_id: int, load_id: str, action_key: str) -> bool:
+    """
+    Deducts service credits for a specific action. Single entry point for the Usage Menu.
+    AUTO_BOOKING: delegates to deduct_success_fee (idempotent).
+    Others: insert CONSUMED row (each action charged).
+    Returns True if charged, False if skipped/failed.
+    """
+    if not engine or not trucker_id or not load_id or not action_key:
+        return False
+    cost = USAGE_RATES.get(action_key)
+    if cost is None or cost <= 0:
+        return False
+
+    if action_key == "AUTO_BOOKING":
+        return deduct_success_fee(engine, trucker_id, load_id)
+
+    try:
+        with engine.begin() as conn:
+            mc_row = conn.execute(
+                text("SELECT mc_number FROM webwise.trucker_profiles WHERE id = :tid"),
+                {"tid": trucker_id},
+            ).first()
+            if not mc_row or not mc_row[0]:
+                return False
+            mc_number = mc_row[0]
+
+            conn.execute(
+                text("""
+                    INSERT INTO webwise.driver_savings_ledger
+                    (driver_mc_number, load_id, amount_usd, amount_candle, unlocks_at, status)
+                    VALUES (:mc, :load_id, :usd, :candle, now(), 'CONSUMED')
+                """),
+                {
+                    "mc": mc_number,
+                    "load_id": load_id,
+                    "usd": -float(cost),
+                    "candle": -float(cost),
+                },
+            )
+            return True
+    except Exception as e:
+        print(f"Ledger record_usage error: {e}")
+        return False
+
+
+def deduct_success_fee(engine, trucker_id: int, load_id: str) -> bool:
+    """
+    Deducts AUTOPILOT_COST (3.0) $CANDLE for a successful autonomous booking.
+    Only called when a Rate Confirmation is detected by the inbound listener.
+    Idempotent: returns False if already charged for this load (no double-billing).
+    """
+    if not engine or not trucker_id or not load_id:
+        return False
+
+    try:
+        with engine.begin() as conn:
+            mc_row = conn.execute(
+                text("SELECT mc_number FROM webwise.trucker_profiles WHERE id = :tid"),
+                {"tid": trucker_id},
+            ).first()
+            if not mc_row or not mc_row[0]:
+                return False
+            mc_number = mc_row[0]
+
+            # Idempotent: already charged for this load?
+            existing = conn.execute(
+                text("""
+                    SELECT id FROM webwise.driver_savings_ledger
+                    WHERE driver_mc_number = :mc AND load_id = :load_id AND status = 'CONSUMED'
+                """),
+                {"mc": mc_number, "load_id": load_id},
+            ).first()
+            if existing:
+                return False
+
+            # Insert CONSUMED row (negative = deduction)
+            conn.execute(
+                text("""
+                    INSERT INTO webwise.driver_savings_ledger
+                    (driver_mc_number, load_id, amount_usd, amount_candle, unlocks_at, status)
+                    VALUES (:mc, :load_id, :usd, :candle, now(), 'CONSUMED')
+                """),
+                {
+                    "mc": mc_number,
+                    "load_id": load_id,
+                    "usd": -float(AUTOPILOT_COST),
+                    "candle": -float(AUTOPILOT_COST),
+                },
+            )
+            return True
+    except Exception as e:
+        print(f"Ledger deduct_success_fee error: {e}")
+        return False

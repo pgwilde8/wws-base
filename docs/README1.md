@@ -12,12 +12,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8990 --reload --log-level debug --acc
 
 tree /srv/projects/client/dispatch
 tree /srv/projects/client/dispatch/app/api/v1/__pycache__
+tree /srv/projects/client/dispatch/app/templates/drivers
 
 # Do NOT commit real tokens. Use a placeholder or keep in .env / local notes only.
 # git remote set-url origin https://YOUR_TOKEN@github.com/pgwilde8/dispatch.git
 
 git add -A
-git commit -m "bdb3"
+git commit -m "new upgrades and email1"
 git push -u origin main
 
 http://134.199.241.56:8990/admin/login
@@ -29,11 +30,10 @@ Enter:
 Email: driver@test.com
 Password: test123
 
-email:
-dispatch@gcdloads.com
-1@NqEfg#^gaVsX1&
-
 Your Key: 41713b4c27074cdf51f08ba1906e860f9205ec66f14f0ac90b115decf2233c3c
+
+Mission Accomplished: Rate Con received, 3.0 $CANDLE deducted
+
 
 -- Replace 'XXXXXX' with the MC number for Online Freight
 INSERT INTO webwise.brokers (mc_number, company_name, primary_email, source)

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; }
+        .cta-button { display: inline-block; background: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+        .fuel-box { background: #1e40af; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .usage-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .usage-table th, .usage-table td { padding: 10px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        .usage-table th { background: #f3f4f6; font-size: 12px; text-transform: uppercase; }
+        .cost-badge { background: #22c55e; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Your GCD Identity is Live</h1>
+            <p style="margin: 0; opacity: 0.9;">Professional infrastructure activated</p>
+        </div>
+        <div class="content">
+            <p>Hey {{ driver_name }},</p>
+            <p>Your professional infrastructure is now live. Your $25 setup includes <strong>{{ starter_credits }} $CANDLE</strong> in your Automation Fuel Tank.</p>
+            <div class="fuel-box">
+                <h3 style="margin-top: 0;">Your Dispatch Identity</h3>
+                <ul style="margin: 0; padding-left: 20px;">
+                    <li><strong>Dispatch Email:</strong> {{ dispatch_email }}</li>
+                    <li><strong>MC Number:</strong> {{ mc_number }}</li>
+                    <li><strong>Starter Fuel:</strong> {{ starter_credits }} $CANDLE</li>
+                </ul>
+            </div>
+            <h3>How to use your first 10 credits</h3>
+            <table class="usage-table">
+                <tr><th>Action</th><th>Cost</th><th>Description</th></tr>
+                <tr><td>Outreach</td><td><span class="cost-badge">0.1</span></td><td>Send inquiry or counter email to broker</td></tr>
+                <tr><td>Automation</td><td><span class="cost-badge">3.0</span></td><td>Autonomous Dispatch - charged only when load is booked</td></tr>
+                <tr><td>Voice</td><td><span class="cost-badge">0.5</span></td><td>Escalate to AI phone call with broker</td></tr>
+            </table>
+            <p>Use your dispatch email when contacting brokers.</p>
+            <p style="text-align: center;">
+                <a href="{{ login_url }}" class="cta-button">Open Your Terminal</a>
+            </p>
+            <p>Let's book your first load,<br><strong>The Green Candle Team</strong></p>
+        </div>
+        <div class="footer">
+            <p>Green Candle Dispatch LLC | Driver-Owned AI Dispatch</p>
+        </div>
+    </div>
+</body>
+</html>

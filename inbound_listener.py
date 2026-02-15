@@ -34,6 +34,13 @@ DB_URL = os.getenv("DATABASE_URL", "postgresql://wws-admin:WwsAdmin2026%21@local
 engine = create_engine(DB_URL)
 
 
+def check_for_rate_con(subject: str, body: str) -> bool:
+    """Detect Rate Confirmation keywords in email subject or body."""
+    keywords = ["rate confirmation", "ratecon", "rate con", "rc attached", "signed copy", "rate confirmation attached"]
+    content = ((subject or "") + " " + (body or ""))[:2000].lower()
+    return any(k in content for k in keywords)
+
+
 def _message_id_or_fallback(msg, sender: str, subject: str, body: str) -> str:
     """Use Message-ID header, or generate fallback for deduplication."""
     msg_id = msg.get("Message-ID")
@@ -133,11 +140,43 @@ def listen_for_replies() -> None:
 
                     # Auto-Pilot: if new message, check if this load has autopilot enabled
                     if rowcount > 0 and load_id and load_id != "GENERAL":
+                        tag_part = recipient.split("@")[0] if recipient and "@" in recipient else ""
+                        driver_name = (tag_part.split("+")[0] if "+" in tag_part else "").strip()
+
+                        # Rate Con detector: deduct 3.0 $CANDLE on success (consumption-based)
+                        if driver_name and check_for_rate_con(subject, body):
+                            try:
+                                from app.services.ledger import deduct_success_fee, AUTOPILOT_COST
+                                with engine.begin() as conn:
+                                    rc_row = conn.execute(
+                                        text("""
+                                            SELECT aps.trucker_id FROM webwise.autopilot_settings aps
+                                            JOIN webwise.trucker_profiles tp ON aps.trucker_id = tp.id
+                                            WHERE LOWER(TRIM(tp.display_name)) = :dn
+                                              AND aps.load_id = :load_id
+                                              AND aps.is_autopilot = true
+                                        """),
+                                        {"dn": driver_name.lower(), "load_id": load_id},
+                                    ).first()
+                                if rc_row:
+                                    tid = rc_row[0]
+                                    if deduct_success_fee(engine, tid, load_id):
+                                        with engine.begin() as conn2:
+                                            conn2.execute(
+                                                text("""
+                                                    INSERT INTO webwise.notifications (trucker_id, message, notif_type, is_read)
+                                                    VALUES (:tid, :msg, 'AUTOPILOT_SUCCESS', false)
+                                                """),
+                                                {"tid": tid, "msg": f"🏆 LOAD BOOKED! Rate confirmation received for Load #{load_id}. {AUTOPILOT_COST} $CANDLE utilized for this mission."},
+                                            )
+                                        print(f"✅ Rate Con detected → deducted {AUTOPILOT_COST} $CANDLE for Load {load_id}")
+                            except Exception as rc_err:
+                                print(f"⚠️ Rate Con deduction error: {rc_err}")
+
+                        # Auto-Pilot: process broker reply (negotiate/counter logic)
                         process_fn, parse_fn = _autopilot_available()
                         if process_fn and parse_fn:
                             try:
-                                tag_part = recipient.split("@")[0] if recipient and "@" in recipient else ""
-                                driver_name = tag_part.split("+")[0] if "+" in tag_part else ""
                                 broker_email = parse_fn(sender)
                                 if driver_name and broker_email:
                                     with engine.begin() as conn:
@@ -150,7 +189,7 @@ def listen_for_replies() -> None:
                                                 AND aps.load_id = :load_id
                                                 AND aps.is_autopilot = true
                                             """),
-                                            {"dn": driver_name.strip().lower(), "load_id": load_id},
+                                            {"dn": driver_name.lower(), "load_id": load_id},
                                         ).first()
                                     if row:
                                         status = process_fn(

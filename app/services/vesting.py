@@ -40,16 +40,16 @@ class VestingService:
                 
                 mc_number = mc_row[0]
                 
-                # CREDITED = immediate rebate (new model). VESTED/LOCKED(unlocked) = legacy.
+                # CREDITED/VESTED/LOCKED(unlocked) = credits. CONSUMED = deductions (negative).
+                # Sum includes CONSUMED so balance = credits - consumed.
                 result = conn.execute(
                     text("""
                         SELECT COALESCE(SUM(amount_candle), 0) as balance
                         FROM webwise.driver_savings_ledger
                         WHERE driver_mc_number = :mc
                           AND status != 'CLAIMED'
-                          AND status != 'CONSUMED'
                           AND (
-                              status IN ('CREDITED', 'VESTED')
+                              status IN ('CREDITED', 'VESTED', 'CONSUMED')
                               OR (status = 'LOCKED' AND unlocks_at <= now())
                           )
                     """),

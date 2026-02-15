@@ -1,0 +1,63 @@
+<div class="bg-slate-900 border-2 border-dashed border-slate-700 rounded-2xl p-6" id="onboarding-container">
+    <form id="mc-form" class="space-y-4">
+        <div class="flex items-center justify-center gap-2 mb-4">
+            <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">✓</span>
+            <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">2</span>
+            <span class="bg-slate-700 text-slate-400 text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center">3</span>
+        </div>
+        <h2 class="text-green-400 font-bold mb-1 text-center">Step 2: Verify Authority</h2>
+        <p class="text-[10px] text-slate-500 mb-4 text-center">
+            Your dispatch email <span class="text-white font-mono">{{ display_name }}@{{ email_domain }}</span> is secured.
+        </p>
+        <p class="text-[10px] text-slate-500 mb-4 text-center">Enter your MC or DOT number to continue.</p>
+
+        <div class="space-y-3 max-w-xs mx-auto">
+            <div>
+                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">Authority Type</label>
+                <select name="authority_type" class="w-full bg-black border border-slate-600 p-2 rounded-lg text-white text-sm">
+                    <option value="MC">MC</option>
+                    <option value="DOT">DOT</option>
+                </select>
+            </div>
+            <div id="mc-field">
+                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">MC Number</label>
+                <input type="text" name="mc_number" placeholder="MC123456" class="w-full bg-black border-2 border-slate-600 p-3 rounded-lg text-center font-mono text-white">
+            </div>
+            <div id="dot-field" class="hidden">
+                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1">DOT Number</label>
+                <input type="text" name="dot_number" placeholder="1234567" class="w-full bg-black border-2 border-slate-600 p-3 rounded-lg text-center font-mono text-white">
+            </div>
+        </div>
+
+        <div class="flex justify-center mt-4">
+            <button type="submit"
+                    hx-post="/clients/onboarding/claim-mc"
+                    hx-include="#mc-form"
+                    hx-target="#onboarding-container"
+                    hx-swap="outerHTML"
+                    class="bg-green-600 hover:bg-green-500 text-white text-xs font-bold py-2 px-8 rounded-full transition active:scale-95">
+                Verify & Fuel Up
+            </button>
+        </div>
+    </form>
+    <script>
+        (function() {
+            var form = document.getElementById('mc-form');
+            if (!form) return;
+            var authSelect = form.querySelector('[name="authority_type"]');
+            var mcField = document.getElementById('mc-field');
+            var dotField = document.getElementById('dot-field');
+            var mcInput = form.querySelector('[name="mc_number"]');
+            var dotInput = form.querySelector('[name="dot_number"]');
+            function toggle() {
+                var isMC = authSelect.value === 'MC';
+                if (mcField) mcField.classList.toggle('hidden', !isMC);
+                if (dotField) dotField.classList.toggle('hidden', isMC);
+                if (mcInput) { mcInput.required = isMC; mcInput.disabled = !isMC; }
+                if (dotInput) { dotInput.required = !isMC; dotInput.disabled = isMC; }
+            }
+            if (authSelect) authSelect.addEventListener('change', toggle);
+            toggle();
+        })();
+    </script>
+</div>

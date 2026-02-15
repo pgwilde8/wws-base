@@ -15,6 +15,7 @@ MX_PORT = int(os.getenv("MXROUTE_SMTP_PORT", "465"))
 MX_USER = os.getenv("MXROUTE_SMTP_USER")
 MX_PASS = os.getenv("MXROUTE_SMTP_PASSWORD")
 EMAIL_DOMAIN = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+MXROUTE_FROM_EMAIL = os.getenv("MXROUTE_FROM_EMAIL", "noreply@greencandledispatch.com")
 
 # Alias the variables if you need the older names for compatibility
 MXROUTE_SMTP_HOST = MX_HOST
@@ -28,11 +29,13 @@ def send_negotiation_email(
     body: str,
     load_id: str,
     negotiation_id: int,
-    driver_name: str, # Added to identify the sender
-    load_source: Optional[str] = None
+    driver_name: str,
+    load_source: Optional[str] = None,
+    truck_number: Optional[str] = None,
 ) -> Dict[str, any]:
     """
     Sends email from [driver]+[load_id]@gcdloads.com via Fusion SMTP.
+    If truck_number is set (fleet), appends professional fleet line to body.
     """
     if not MXROUTE_SMTP_USER or not MXROUTE_SMTP_PASSWORD:
         return {"status": "error", "message": "SMTP credentials missing in .env"}
@@ -53,7 +56,10 @@ def send_negotiation_email(
         msg['Reply-To'] = sender_email 
 
         # Body with context for the broker
-        full_body = f"{body}\n\n---\nRef: {load_id}"
+        full_body = body
+        if truck_number and str(truck_number).strip():
+            full_body += f"\n\nOur driver in Truck #{truck_number.strip()} is ready to pick this up."
+        full_body += f"\n\n---\nRef: {load_id}"
         msg.attach(MIMEText(full_body, 'plain'))
 
         # 3. Connect via SSL to Fusion

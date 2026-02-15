@@ -172,12 +172,25 @@ def run_bootstrap():
                                AND column_name = 'dot_number') THEN
                     ALTER TABLE webwise.trucker_profiles ADD COLUMN dot_number VARCHAR(50);
                 END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'trucker_profiles' 
+                               AND column_name = 'is_first_login') THEN
+                    ALTER TABLE webwise.trucker_profiles ADD COLUMN is_first_login BOOLEAN DEFAULT false;
+                END IF;
             END $$;
         """))
         conn.execute(text("""
             DO $$ BEGIN
                 ALTER TABLE webwise.negotiations
                 ADD COLUMN trucker_id INTEGER REFERENCES webwise.trucker_profiles(id);
+            EXCEPTION WHEN duplicate_column THEN NULL;
+            END $$;
+        """))
+        conn.execute(text("""
+            DO $$ BEGIN
+                ALTER TABLE webwise.negotiations
+                ADD COLUMN assigned_truck VARCHAR(20);
             EXCEPTION WHEN duplicate_column THEN NULL;
             END $$;
         """))

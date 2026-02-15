@@ -1,3 +1,4 @@
+import os
 from typing import Optional, Dict
 
 from fastapi import APIRouter, Request, Depends, UploadFile, File, Form, HTTPException, Body
@@ -18,8 +19,8 @@ from app.services.email import send_negotiation_email
 from app.services.ai_logic import extract_bid_details, parse_sender_email
 from app.services.calculator import calculate_break_even, DEFAULT_FUEL_PRICE
 from app.services.market_intel import get_market_average, parse_origin_dest_states
-from app.services.ledger import issue_load_credits, AUTOPILOT_COST, estimate_credits_for_load
-from app.services.vesting import VestingService, AUTOPILOT_COST
+from app.services.ledger import issue_load_credits, record_usage, AUTOPILOT_COST, estimate_credits_for_load, OUTBOUND_EMAIL_COST
+from app.services.vesting import VestingService
 from app.schemas.load import LoadResponse, LoadStatus
 
 router = APIRouter()
@@ -30,6 +31,358 @@ def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_us
     if not user or user.get("role") != "client":
         return RedirectResponse(url="/login/client", status_code=303)
     return templates.TemplateResponse("drivers/dashboard.html", {"request": request, "user": user})
+
+
+@router.get("/clients/fleet", response_class=HTMLResponse)
+def fleet_fuel_audit(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """
+    Fleet Fuel Audit: per-truck consumption report for fleet managers.
+    Shows fuel tank gauge and per-truck activity (emails, bookings, spend).
+    """
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        return templates.TemplateResponse(
+            "drivers/fleet_audit.html",
+            {"request": request, "user": user, "error": "Database not available", "audit_rows": [], "balance": 0, "mc_number": None},
+        )
+    mc_number = None
+    trucker_id = None
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id, mc_number FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if row:
+            trucker_id = row[0]
+            mc_number = row[1]
+    if not mc_number:
+        return templates.TemplateResponse(
+            "drivers/fleet_audit.html",
+            {"request": request, "user": user, "error": "No MC number found", "audit_rows": [], "balance": 0, "mc_number": None},
+        )
+    balance = VestingService.get_claimable_balance(engine, trucker_id) if trucker_id else 0.0
+    audit_rows = []
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text("""
+                WITH consumed_with_truck AS (
+                    SELECT 
+                        dsl.load_id,
+                        dsl.amount_candle,
+                        (SELECT n.assigned_truck FROM webwise.negotiations n
+                         WHERE n.load_id = dsl.load_id AND n.trucker_id = tp.id
+                         ORDER BY n.id DESC LIMIT 1) AS assigned_truck
+                    FROM webwise.driver_savings_ledger dsl
+                    INNER JOIN webwise.trucker_profiles tp ON tp.mc_number = dsl.driver_mc_number
+                    WHERE dsl.driver_mc_number = :mc AND dsl.status = 'CONSUMED'
+                )
+                SELECT 
+                    COALESCE(assigned_truck, '—') AS truck_id,
+                    COUNT(*)::int AS actions_taken,
+                    ROUND(SUM(ABS(amount_candle))::numeric, 1)::float AS total_spend,
+                    SUM(CASE WHEN amount_candle <= -2.99 AND amount_candle >= -3.01 THEN 1 ELSE 0 END)::int AS loads_booked,
+                    SUM(CASE WHEN amount_candle <= -0.11 AND amount_candle >= -0.09 THEN 1 ELSE 0 END)::int AS manual_emails,
+                    SUM(CASE WHEN amount_candle <= -0.51 AND amount_candle >= -0.49 THEN 1 ELSE 0 END)::int AS voice_calls
+                FROM consumed_with_truck
+                GROUP BY COALESCE(assigned_truck, '—')
+                ORDER BY total_spend DESC
+            """),
+            {"mc": mc_number},
+        ).fetchall()
+        for r in rows:
+            truck_id = r[0] or "—"
+            actions = r[1] or 0
+            total_spend = float(r[2] or 0)
+            loads_booked = r[3] or 0
+            manual_emails = r[4] or 0
+            voice_calls = r[5] or 0
+            if loads_booked > 0:
+                result_status = "BOOKED"
+                result_icon = "✅"
+            elif actions > 0:
+                result_status = "Negotiating"
+                result_icon = "⏳"
+            else:
+                result_status = "—"
+                result_icon = "—"
+            if actions > 0 and loads_booked == 0 and total_spend >= 3:
+                result_status = "Dead"
+                result_icon = "❌"
+            activity_parts = []
+            if manual_emails:
+                activity_parts.append(f"{manual_emails} Inquiries")
+            if loads_booked:
+                activity_parts.append(f"{loads_booked} Booking{'s' if loads_booked != 1 else ''}")
+            if voice_calls:
+                activity_parts.append(f"{voice_calls} Voice")
+            activity_summary = ", ".join(activity_parts) if activity_parts else "—"
+            audit_rows.append({
+                "truck_id": truck_id,
+                "activity_summary": activity_summary,
+                "total_spend": total_spend,
+                "loads_booked": loads_booked,
+                "manual_emails": manual_emails,
+                "voice_calls": voice_calls,
+                "actions_taken": actions,
+                "result_status": result_status,
+                "result_icon": result_icon,
+            })
+    total_spend = sum(r["total_spend"] for r in audit_rows)
+    total_actions = sum(r["actions_taken"] for r in audit_rows)
+    total_booked = sum(r["loads_booked"] for r in audit_rows)
+    return templates.TemplateResponse(
+        "drivers/fleet_audit.html",
+        {
+            "request": request,
+            "user": user,
+            "audit_rows": audit_rows,
+            "balance": balance,
+            "mc_number": mc_number,
+            "total_spend": total_spend,
+            "total_actions": total_actions,
+            "total_booked": total_booked,
+            "error": None,
+        },
+    )
+
+
+@router.get("/clients/onboarding/check-handle", response_class=HTMLResponse)
+def onboarding_check_handle(
+    request: Request,
+    handle: str = "",
+    user: Optional[Dict] = Depends(current_user),
+):
+    """
+    HTMX: Check if dispatch handle is available. Returns availability HTML snippet.
+    """
+    if not user or user.get("role") != "client" or not engine:
+        return HTMLResponse(content="")
+    raw = (handle or "").strip().lower()
+    if len(raw) < 2:
+        return HTMLResponse(content='<div id="handle-status" class="mt-2 text-[10px] h-4 text-slate-500">Enter 2+ characters</div>')
+    import re
+    if not re.match(r"^[a-z0-9][a-z0-9._-]*[a-z0-9]$|^[a-z0-9]$", raw):
+        return HTMLResponse(
+            content='<div id="handle-status" class="mt-2 text-[10px] h-4 text-amber-400">Use letters, numbers, dots, hyphens only</div>'
+        )
+    if len(raw) > 40:
+        return HTMLResponse(content='<div id="handle-status" class="mt-2 text-[10px] h-4 text-amber-400">Max 40 characters</div>')
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    with engine.begin() as conn:
+        existing = conn.execute(
+            text("""
+                SELECT id FROM webwise.trucker_profiles
+                WHERE LOWER(TRIM(display_name)) = :handle
+            """),
+            {"handle": raw},
+        ).first()
+    if existing:
+        suggestions = [f"{raw}2", f"{raw}.mc", f"driver.{raw}"]
+        sugg_text = " or ".join(suggestions[:3])
+        return templates.TemplateResponse(
+            "drivers/partials/onboarding_handle_taken.html",
+            {"request": request, "handle": raw, "email_domain": email_domain, "suggestions": suggestions, "sugg_text": sugg_text},
+        )
+    return templates.TemplateResponse(
+        "drivers/partials/onboarding_handle_available.html",
+        {"request": request, "handle": raw, "email_domain": email_domain},
+    )
+
+
+@router.post("/clients/onboarding/claim-handle", response_class=HTMLResponse)
+def onboarding_claim_handle(
+    request: Request,
+    handle: str = Form(""),
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Claim dispatch handle. Creates or updates trucker_profile with display_name."""
+    if not user or user.get("role") != "client" or not engine:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    raw = (handle or "").strip().lower()
+    if len(raw) < 2 or len(raw) > 40:
+        raise HTTPException(status_code=400, detail="Handle must be 2–40 characters")
+    import re
+    if not re.match(r"^[a-z0-9][a-z0-9._-]*[a-z0-9]$|^[a-z0-9]$", raw):
+        raise HTTPException(status_code=400, detail="Use letters, numbers, dots, hyphens only")
+    with engine.begin() as conn:
+        taken = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE LOWER(TRIM(display_name)) = :handle AND user_id != :uid"),
+            {"handle": raw, "uid": user.get("id")},
+        ).first()
+        if taken:
+            raise HTTPException(status_code=400, detail="Handle is taken")
+        row = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if row:
+            conn.execute(
+                text("UPDATE webwise.trucker_profiles SET display_name = :dn, updated_at = now() WHERE user_id = :uid"),
+                {"dn": raw, "uid": user.get("id")},
+            )
+        else:
+            conn.execute(
+                text("""
+                    INSERT INTO webwise.trucker_profiles (user_id, display_name, carrier_name, is_first_login)
+                    VALUES (:uid, :dn, 'Pending', true)
+                """),
+                {"uid": user.get("id"), "dn": raw},
+            )
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    return templates.TemplateResponse(
+        "drivers/partials/onboarding_step2.html",
+        {"request": request, "email_domain": email_domain, "display_name": raw},
+    )
+
+
+@router.post("/clients/onboarding/claim-mc", response_class=HTMLResponse)
+def onboarding_claim_mc(
+    request: Request,
+    mc_number: str = Form(""),
+    dot_number: str = Form(""),
+    authority_type: str = Form("MC"),
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Step 2: Save MC/DOT and issue starter credits."""
+    if not user or user.get("role") != "client" or not engine:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    mc_clean = (mc_number or "").strip()
+    dot_clean = (dot_number or "").strip()
+    auth_type = (authority_type or "MC").strip().upper()
+    if auth_type not in ("MC", "DOT"):
+        auth_type = "MC"
+    if auth_type == "MC" and not mc_clean:
+        raise HTTPException(status_code=400, detail="MC Number is required")
+    if auth_type == "DOT" and not dot_clean:
+        raise HTTPException(status_code=400, detail="DOT Number is required")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row or not (row.display_name or "").strip():
+            raise HTTPException(status_code=400, detail="Complete Step 1 first")
+        trucker_id = row[0]
+        display_name = (row.display_name or "").strip().lower()
+        conn.execute(
+            text("""
+                UPDATE webwise.trucker_profiles
+                SET mc_number = :mc, dot_number = :dot, authority_type = :auth, updated_at = now()
+                WHERE user_id = :uid
+            """),
+            {"mc": mc_clean if auth_type == "MC" else None, "dot": dot_clean if auth_type == "DOT" else None, "auth": auth_type, "uid": user.get("id")},
+        )
+    from app.services.onboarding import onboard_new_driver
+    mc_for_ledger = mc_clean if auth_type == "MC" else dot_clean
+    dot_for_ledger = dot_clean if auth_type == "MC" else ""
+    onboard_new_driver(engine, user.get("id"), mc_for_ledger, dot_for_ledger, display_name, "SOLO")
+    from app.services.vesting import VestingService
+    balance = VestingService.get_claimable_balance(engine, trucker_id)
+    return templates.TemplateResponse(
+        "drivers/partials/onboarding_step3.html",
+        {"request": request, "balance": balance, "display_name": display_name, "email_domain": os.getenv("EMAIL_DOMAIN", "gcdloads.com")},
+    )
+
+
+@router.get("/clients/dashboard-mission", response_class=HTMLResponse)
+def dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """
+    Returns onboarding stepper (if incomplete) or active-load widget.
+    Replaces "Current Mission" for first-time users.
+    """
+    if not user or user.get("role") != "client" or not engine:
+        return HTMLResponse(content="")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("""
+                SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, tp.is_first_login
+                FROM webwise.trucker_profiles tp
+                WHERE tp.user_id = :uid
+            """),
+            {"uid": user.get("id")},
+        ).first()
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    needs_handle = not row or not (row.display_name or "").strip()
+    has_mc_or_dot = row and ((row.mc_number or "").strip() or (row.dot_number or "").strip())
+    needs_mc = row and (row.display_name or "").strip() and not has_mc_or_dot
+    if needs_handle:
+        return templates.TemplateResponse(
+            "drivers/partials/onboarding_step1.html",
+            {"request": request, "email_domain": email_domain},
+        )
+    if needs_mc:
+        return templates.TemplateResponse(
+            "drivers/partials/onboarding_step2.html",
+            {"request": request, "email_domain": email_domain, "display_name": (row.display_name or "").strip()},
+        )
+    from app.services.vesting import VestingService
+    balance = VestingService.get_claimable_balance(engine, row.id) if row else 0.0
+    is_first_login = bool(row and getattr(row, "is_first_login", False))
+    if is_first_login and balance > 0:
+        return templates.TemplateResponse(
+            "drivers/partials/onboarding_step3.html",
+            {"request": request, "balance": balance, "display_name": (row.display_name or "").strip(), "email_domain": email_domain},
+        )
+    return active_load(request, user)
+
+
+@router.get("/clients/welcome-fuel-banner", response_class=HTMLResponse)
+def welcome_fuel_banner(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """
+    HTMX: Returns "Your Robot is Fueled Up" banner when is_first_login and balance > 0.
+    Returns empty when dismissed or not first login.
+    """
+    if not user or user.get("role") != "client" or not engine:
+        return HTMLResponse(content="")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("""
+                SELECT tp.id, tp.is_first_login, tp.mc_number
+                FROM webwise.trucker_profiles tp
+                WHERE tp.user_id = :uid
+            """),
+            {"uid": user.get("id")},
+        ).first()
+    if not row:
+        return HTMLResponse(content="")
+    trucker_id, is_first_login, mc_number = row[0], row[1], row[2]
+    if not is_first_login or not mc_number:
+        return HTMLResponse(content="")
+    from app.services.vesting import VestingService
+    balance = VestingService.get_claimable_balance(engine, trucker_id)
+    if balance <= 0:
+        return HTMLResponse(content="")
+    return templates.TemplateResponse(
+        "drivers/partials/welcome_fuel_banner.html",
+        {"request": request, "balance": balance},
+    )
+
+
+@router.post("/clients/dismiss-first-login", response_class=HTMLResponse)
+def dismiss_first_login(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """HTMX: Sets is_first_login = false, returns empty (removes banner)."""
+    if not user or user.get("role") != "client" or not engine:
+        return HTMLResponse(content="")
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE webwise.trucker_profiles SET is_first_login = false WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        )
+    return HTMLResponse(content="")
+
+
+@router.post("/clients/onboarding/complete", response_class=HTMLResponse)
+def onboarding_complete(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Dismiss first login and return the mission widget (active load)."""
+    if not user or user.get("role") != "client" or not engine:
+        return HTMLResponse(content="")
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE webwise.trucker_profiles SET is_first_login = false WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        )
+    return active_load(request, user)
 
 
 @router.get("/clients/active-load", response_class=HTMLResponse)
@@ -208,8 +561,22 @@ def negotiation_terminal(request: Request, load_id: str, user: Optional[Dict] = 
             target_price = int(latest_offer) + 150  # suggest +$150 counter
             gap = target_price - int(latest_offer)
 
-    # Auto-Pilot settings for this load
     trucker_id = row.id
+
+    # Assigned truck (fleet) for this load's negotiation
+    assigned_truck = None
+    with engine.begin() as conn_neg:
+        neg_row = conn_neg.execute(
+            text("""
+                SELECT assigned_truck FROM webwise.negotiations
+                WHERE load_id = :load_id AND trucker_id = :tid
+                ORDER BY id DESC LIMIT 1
+            """),
+            {"load_id": load_id, "tid": trucker_id},
+        ).first()
+        if neg_row and neg_row[0]:
+            assigned_truck = neg_row[0]
+
     autopilot_row = None
     with engine.begin() as conn2:
         autopilot_row = conn2.execute(
@@ -248,6 +615,24 @@ def negotiation_terminal(request: Request, load_id: str, user: Optional[Dict] = 
     driver_balance = VestingService.get_claimable_balance(engine, trucker_id)
     can_use_autopilot = driver_balance >= AUTOPILOT_COST
 
+    # Mission Accomplished: Rate Con detected → 3.0 $CANDLE deducted recently?
+    show_mission_accomplished = False
+    with engine.begin() as conn_ma:
+        mc_row = conn_ma.execute(
+            text("SELECT mc_number FROM webwise.trucker_profiles WHERE id = :tid"),
+            {"tid": trucker_id},
+        ).first()
+        if mc_row and mc_row[0]:
+            recent = conn_ma.execute(
+                text("""
+                    SELECT 1 FROM webwise.driver_savings_ledger
+                    WHERE driver_mc_number = :mc AND load_id = :load_id AND status = 'CONSUMED'
+                      AND earned_at >= now() - interval '1 hour'
+                """),
+                {"mc": mc_row[0], "load_id": load_id},
+            ).first()
+            show_mission_accomplished = recent is not None
+
     settings = {
         "is_autopilot": is_autopilot,
         "floor_price": autopilot_floor,
@@ -272,6 +657,8 @@ def negotiation_terminal(request: Request, load_id: str, user: Optional[Dict] = 
             "driver_balance": driver_balance,
             "autopilot_cost": AUTOPILOT_COST,
             "can_use_autopilot": can_use_autopilot,
+            "show_mission_accomplished": show_mission_accomplished,
+            "assigned_truck": assigned_truck,
         },
     )
 
@@ -282,6 +669,7 @@ def negotiate_counter(
     request: Request,
     user: Optional[Dict] = Depends(current_user),
     increment: int = Form(100),
+    truck_number: Optional[str] = Form(None),
 ):
     """
     Driver taps Counter +$100 (or custom increment). Finds broker from last message,
@@ -323,6 +711,14 @@ def negotiate_counter(
     if not msgs:
         raise HTTPException(status_code=400, detail="No broker messages for this load")
 
+    # Balance check: 0.1 $CANDLE per outbound email
+    balance = VestingService.get_claimable_balance(engine, trucker_id)
+    if balance < OUTBOUND_EMAIL_COST:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Insufficient $CANDLE. Need {OUTBOUND_EMAIL_COST} for outbound email, have {balance:.2f}.",
+        )
+
     last = msgs[0]
     broker_email = parse_sender_email(last.sender_email or "")
     if not broker_email or "@" not in broker_email:
@@ -333,7 +729,7 @@ def negotiate_counter(
     current_rate = float(base_offer) if base_offer is not None else 0.0
     new_rate = int(current_rate) + int(increment)
 
-    # Find or create negotiation
+    # Find or create negotiation; store assigned truck (fleet)
     with engine.begin() as conn:
         neg = conn.execute(
             text("""
@@ -345,12 +741,17 @@ def negotiate_counter(
         ).first()
         if neg:
             negotiation_id = neg[0]
+            truck_val = truck_number.strip() if truck_number and str(truck_number).strip() else None
+            conn.execute(
+                text("UPDATE webwise.negotiations SET assigned_truck = :truck WHERE id = :nid"),
+                {"truck": truck_val, "nid": negotiation_id},
+            )
         else:
-            # Create minimal negotiation for tracking
+            truck_val = truck_number.strip() if truck_number and str(truck_number).strip() else None
             r2 = conn.execute(
                 text("""
-                    INSERT INTO webwise.negotiations (load_id, trucker_id, original_rate, target_rate, status)
-                    VALUES (:load_id, :trucker_id, :rate, :target, 'sent')
+                    INSERT INTO webwise.negotiations (load_id, trucker_id, original_rate, target_rate, status, assigned_truck)
+                    VALUES (:load_id, :trucker_id, :rate, :target, 'sent', :truck)
                     RETURNING id
                 """),
                 {
@@ -358,6 +759,7 @@ def negotiate_counter(
                     "trucker_id": trucker_id,
                     "rate": current_rate,
                     "target": new_rate,
+                    "truck": truck_val,
                 },
             )
             negotiation_id = r2.scalar()
@@ -372,10 +774,13 @@ def negotiate_counter(
         negotiation_id=negotiation_id,
         driver_name=display_name,
         load_source=None,
+        truck_number=truck_number,
     )
 
     if result.get("status") != "success":
         raise HTTPException(status_code=500, detail=result.get("message", "Failed to send email"))
+
+    record_usage(engine, trucker_id, load_id, "MANUAL_EMAIL")
 
     # HTMX: swap=none, trigger refresh so terminal updates
     return HTMLResponse(
@@ -390,6 +795,7 @@ def negotiate_counter_to_market(
     load_id: str,
     request: Request,
     user: Optional[Dict] = Depends(current_user),
+    truck_number: Optional[str] = Form(None),
 ):
     """
     Counter at market rate: uses lane data to send broker a fair-market counter.
@@ -433,6 +839,14 @@ def negotiate_counter_to_market(
     if not msgs:
         raise HTTPException(status_code=400, detail="No broker messages for this load")
 
+    # Balance check: 0.1 $CANDLE per outbound email
+    balance = VestingService.get_claimable_balance(engine, trucker_id)
+    if balance < OUTBOUND_EMAIL_COST:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Insufficient $CANDLE. Need {OUTBOUND_EMAIL_COST} for outbound email, have {balance:.2f}.",
+        )
+
     last = msgs[0]
     broker_email = parse_sender_email(last.sender_email or "")
     if not broker_email or "@" not in broker_email:
@@ -460,14 +874,25 @@ def negotiate_counter_to_market(
         ).first()
         if neg:
             negotiation_id = neg[0]
+            truck_val = truck_number.strip() if truck_number and str(truck_number).strip() else None
+            conn.execute(
+                text("UPDATE webwise.negotiations SET assigned_truck = :truck WHERE id = :nid"),
+                {"truck": truck_val, "nid": negotiation_id},
+            )
         else:
+            truck_val = truck_number.strip() if truck_number and str(truck_number).strip() else None
             r2 = conn.execute(
                 text("""
-                    INSERT INTO webwise.negotiations (load_id, trucker_id, original_rate, target_rate, status)
-                    VALUES (:load_id, :trucker_id, 0, :target, 'sent')
+                    INSERT INTO webwise.negotiations (load_id, trucker_id, original_rate, target_rate, status, assigned_truck)
+                    VALUES (:load_id, :trucker_id, 0, :target, 'sent', :truck)
                     RETURNING id
                 """),
-                {"load_id": load_id, "trucker_id": trucker_id, "target": new_rate},
+                {
+                    "load_id": load_id,
+                    "trucker_id": trucker_id,
+                    "target": new_rate,
+                    "truck": truck_val,
+                },
             )
             negotiation_id = r2.scalar()
 
@@ -481,10 +906,13 @@ def negotiate_counter_to_market(
         negotiation_id=negotiation_id,
         driver_name=display_name,
         load_source=None,
+        truck_number=truck_number,
     )
 
     if result.get("status") != "success":
         raise HTTPException(status_code=500, detail=result.get("message", "Failed to send email"))
+
+    record_usage(engine, trucker_id, load_id, "MANUAL_EMAIL")
 
     return HTMLResponse(
         content="",

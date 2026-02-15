@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Green Candle | Fleet Fuel Audit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .neon-text { text-shadow: 0 0 10px rgba(74, 222, 128, 0.5); }
+    </style>
+</head>
+<body class="bg-slate-950 text-white font-sans antialiased min-h-screen pb-20">
+
+    <div class="p-4 border-b border-slate-800 bg-slate-900 sticky top-0 z-50 shadow-lg">
+        <div class="flex justify-between items-center mb-2">
+            <a href="/clients/dashboard" class="text-xl font-black text-green-400 tracking-tighter italic">
+                <i class="fas fa-truck-fast mr-2"></i>GC DISPATCH
+            </a>
+            <div class="text-xs text-slate-500 font-mono bg-slate-800 px-2 py-1 rounded">
+                {% if mc_number %}MC: {{ mc_number }}{% else %}—{% endif %}
+            </div>
+        </div>
+        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">
+            <i class="fas fa-chart-pie mr-1"></i> Fleet Fuel Audit
+        </h2>
+    </div>
+
+    {% if error %}
+    <div class="px-4 py-6">
+        <div class="bg-amber-900/30 border border-amber-500/50 rounded-xl p-4 text-amber-200 text-sm">
+            <i class="fas fa-exclamation-triangle mr-2"></i>{{ error }}
+        </div>
+    </div>
+    {% else %}
+
+    <!-- Fuel Tank Gauge -->
+    {% set remaining = balance %}
+    {% set autopilot_runs = (remaining / 3) | int %}
+    {% set fuel_pct = ((remaining / 50) * 100) if remaining else 0 %}
+    {% set fuel_pct_clamped = fuel_pct if fuel_pct <= 100 else 100 %}
+    <div class="px-4 pt-4 mb-6">
+        <div class="bg-slate-900 rounded-3xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden">
+            <div class="absolute -right-10 -top-10 bg-blue-500/10 w-40 h-40 rounded-full blur-3xl"></div>
+            <div class="relative z-10">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-slate-500 text-[10px] uppercase font-black tracking-[0.2em] mb-1">Fleet Fuel Tank</h3>
+                        <div class="text-3xl font-black text-white">{{ "{:,.1f}".format(remaining) }} $CANDLE</div>
+                        <div class="text-[10px] text-blue-400 mt-1 font-bold">
+                            {{ remaining | int }} left · Enough for {{ autopilot_runs }} Autonomous Booking{{ 's' if autopilot_runs != 1 else '' }}
+                        </div>
+                    </div>
+                    <span class="bg-blue-500/20 text-blue-400 text-[10px] font-black px-3 py-1 rounded-full border border-blue-500/30">
+                        <i class="fas fa-bolt mr-1"></i>ACTIVE
+                    </span>
+                </div>
+                <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                    <div class="flex justify-between text-[10px] text-slate-500 mb-1 font-mono">
+                        <span>0</span>
+                        <span>50 (Fleet Cap)</span>
+                    </div>
+                    <div class="h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                        <div class="bg-green-500/80 h-full transition-all duration-500" style="width: {{ fuel_pct_clamped }}%;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fleet Audit Table -->
+    <div class="px-4">
+        <h3 class="text-slate-500 text-[10px] uppercase font-bold mb-3 tracking-wider">Per-Truck Consumption</h3>
+        <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-800/80 text-[10px] text-slate-400 uppercase font-bold">
+                        <tr>
+                            <th class="px-4 py-3">Truck ID</th>
+                            <th class="px-4 py-3">Activity Summary</th>
+                            <th class="px-4 py-3 text-right">Fuel Consumed</th>
+                            <th class="px-4 py-3 text-center">Result</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        {% for row in audit_rows %}
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="px-4 py-3 font-bold text-white">
+                                {% if row.truck_id == '—' %}— Solo —{% else %}Truck #{{ row.truck_id }}{% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-slate-300">{{ row.activity_summary }}</td>
+                            <td class="px-4 py-3 text-right font-mono font-bold text-amber-400">
+                                {{ "%.1f"|format(row.total_spend) }} $CANDLE
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="inline-flex items-center gap-1">
+                                    {% if row.result_icon == '✅' %}
+                                        <span class="text-green-400">{{ row.result_icon }} {{ row.result_status }}</span>
+                                    {% elif row.result_icon == '⏳' %}
+                                        <span class="text-amber-400">{{ row.result_icon }} {{ row.result_status }}</span>
+                                    {% elif row.result_icon == '❌' %}
+                                        <span class="text-red-400">{{ row.result_icon }} {{ row.result_status }}</span>
+                                    {% else %}
+                                        <span class="text-slate-500">{{ row.result_status }}</span>
+                                    {% endif %}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="px-4 py-12 text-center text-slate-500">
+                                <i class="fas fa-gas-pump text-2xl mb-2 opacity-30"></i>
+                                <p>No consumption data yet.</p>
+                                <p class="text-[10px] mt-1">Use the Truck Selector when countering to track fuel per truck.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if audit_rows %}
+                        <tr class="bg-slate-800/60 font-bold border-t-2 border-slate-700">
+                            <td class="px-4 py-3 text-white">Fleet Totals</td>
+                            <td class="px-4 py-3 text-slate-300">{{ total_actions }} Actions, {{ total_booked }} Win{{ 's' if total_booked != 1 else '' }}</td>
+                            <td class="px-4 py-3 text-right font-mono text-amber-400">{{ "%.1f"|format(total_spend) }} $CANDLE</td>
+                            <td class="px-4 py-3 text-center text-green-400">{{ (balance | int) }} Left</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Fuel Efficiency Note -->
+        <div class="mt-4 p-4 bg-slate-900/80 rounded-xl border border-slate-800">
+            <div class="text-[10px] text-slate-500 uppercase font-bold mb-2">Strategic Value</div>
+            <p class="text-xs text-slate-400">
+                Use this audit to spot trucks burning fuel without returns. If Truck #4 has spent 5.0+ $CANDLE on emails with 0 bookings, consider adjusting lanes or driver preferences.
+            </p>
+        </div>
+    </div>
+
+    {% endif %}
+
+    <!-- Bottom Nav -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 pb-safe-area z-[100]">
+        <div class="flex justify-around items-center h-16">
+            <a href="/clients/dashboard" class="flex flex-col items-center gap-1 text-slate-400 hover:text-green-400">
+                <i class="fas fa-crosshairs text-lg"></i>
+                <span class="text-[10px] font-bold uppercase">Scout</span>
+            </a>
+            <a href="/savings-view" class="flex flex-col items-center gap-1 text-slate-400 hover:text-green-400">
+                <i class="fas fa-vault text-lg"></i>
+                <span class="text-[10px] font-bold uppercase">Vault</span>
+            </a>
+            <a href="/clients/fleet" class="flex flex-col items-center gap-1 text-green-400">
+                <i class="fas fa-users-gear text-lg"></i>
+                <span class="text-[10px] font-bold uppercase">Fleet</span>
+            </a>
+        </div>
+    </nav>
+</body>
+</html>

@@ -1,10 +1,12 @@
-<div class="notification-toast pointer-events-auto bg-gray-900 border-2 {% if notification.notif_type == 'PENDING_APPROVAL' %}border-amber-500{% elif notification.notif_type == 'SYSTEM_ALERT' %}border-yellow-500{% else %}border-green-500{% endif %} p-4 rounded-2xl shadow-2xl flex items-start gap-4 max-w-sm animate-bounce-in" 
+<div class="notification-toast pointer-events-auto bg-gray-900 border-2 {% if notification.notif_type == 'PENDING_APPROVAL' %}border-amber-500{% elif notification.notif_type == 'SYSTEM_ALERT' %}border-yellow-500{% elif notification.notif_type == 'AUTOPILOT_SUCCESS' %}border-green-500{% else %}border-green-500{% endif %} p-4 rounded-2xl shadow-2xl flex items-start gap-4 max-w-sm animate-bounce-in" 
      data-notification-id="{{ notification.id }}" 
      data-notification-type="{{ notification.notif_type }}"
-     {% if notification.notif_type == 'LOAD_WON' %}style="box-shadow: 0 0 20px rgba(34, 197, 94, 0.3), 0 0 40px rgba(34, 197, 94, 0.1);"{% elif notification.notif_type == 'SYSTEM_ALERT' %}style="box-shadow: 0 0 20px rgba(251, 191, 36, 0.4), 0 0 40px rgba(251, 191, 36, 0.2);"{% endif %}>
+     {% if notification.notif_type == 'LOAD_WON' or notification.notif_type == 'AUTOPILOT_SUCCESS' %}style="box-shadow: 0 0 20px rgba(34, 197, 94, 0.3), 0 0 40px rgba(34, 197, 94, 0.1);"{% elif notification.notif_type == 'SYSTEM_ALERT' %}style="box-shadow: 0 0 20px rgba(251, 191, 36, 0.4), 0 0 40px rgba(251, 191, 36, 0.2);"{% endif %}>
   <div class="{% if notification.notif_type == 'PENDING_APPROVAL' %}bg-amber-500/20{% elif notification.notif_type == 'SYSTEM_ALERT' %}bg-yellow-500/20{% else %}bg-green-500/20{% endif %} p-2 rounded-full {% if notification.notif_type == 'PENDING_APPROVAL' %}text-amber-400{% elif notification.notif_type == 'SYSTEM_ALERT' %}text-yellow-400{% else %}text-green-400{% endif %} shrink-0">
     {% if notification.notif_type == 'LOAD_WON' %}
     💰
+    {% elif notification.notif_type == 'AUTOPILOT_SUCCESS' %}
+    🏆
     {% elif notification.notif_type == 'PENDING_APPROVAL' %}
     ⚠️
     {% elif notification.notif_type == 'SYSTEM_ALERT' %}

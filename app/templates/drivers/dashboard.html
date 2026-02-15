@@ -52,28 +52,32 @@
             <div class="text-xs text-slate-500 font-mono" id="mc-display">MC: Loading...</div>
         </div>
         <div class="bg-black rounded px-3 py-1 flex justify-between items-center text-xs font-mono">
-            <span class="text-slate-400">$CANDLE Price:</span>
-            <span class="text-green-400 font-bold">$0.042 <i class="fas fa-caret-up"></i></span>
+            <span class="text-slate-400">$CANDLE</span>
+            <span class="text-green-400 font-bold">1 = $1 service value</span>
         </div>
     </div>
 
-    <!-- Current Mission Widget (Active Load) -->
+    <!-- Welcome Fuel Banner (first login only) -->
+    <div class="px-4" hx-get="/clients/welcome-fuel-banner" hx-trigger="load" hx-swap="innerHTML">
+        <!-- HTMX loads banner when is_first_login and balance > 0 -->
+    </div>
+
+    <!-- Current Mission Widget (Onboarding stepper or Active Load) -->
     <div class="px-4 mb-6">
         <h3 class="text-slate-500 text-[10px] uppercase font-bold mb-2 tracking-wider">Current Mission</h3>
-        <div hx-get="/clients/active-load" 
-             hx-trigger="load, every 15s, negotiationUpdated from:body" 
+        <div id="active-load-loading" class="htmx-indicator mb-2">
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 animate-pulse">
+                <div class="h-20 bg-slate-800 rounded"></div>
+            </div>
+        </div>
+        <div id="dashboard-mission-slot"
+             hx-get="/clients/dashboard-mission" 
+             hx-trigger="load, every 15s, negotiationUpdated from:body, onboardingStepComplete from:body" 
              hx-swap="innerHTML"
              hx-indicator="#active-load-loading">
-            <!-- Loading state -->
-            <div id="active-load-loading" class="htmx-indicator">
-                <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 animate-pulse">
-                    <div class="h-20 bg-slate-800 rounded"></div>
-                </div>
-            </div>
-            <!-- Placeholder when no active load (shown initially, replaced by HTMX) -->
+            <!-- Placeholder (replaced by HTMX) -->
             <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 text-center">
-                <div class="text-slate-500 text-xs">No Active Loads</div>
-                <div class="text-slate-600 text-[10px] mt-1">Complete a negotiation to see your mission here</div>
+                <div class="text-slate-500 text-xs">Loading...</div>
             </div>
         </div>
     </div>

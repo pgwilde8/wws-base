@@ -1,0 +1,18 @@
+<div class="bg-gradient-to-br from-green-900/40 to-slate-900 rounded-2xl border-2 border-green-500/50 p-6" id="onboarding-container">
+    <div class="flex items-center justify-center gap-2 mb-4">
+        <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">✓</span>
+        <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">✓</span>
+        <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">✓</span>
+    </div>
+    <h2 class="text-green-400 font-bold mb-2 text-center">Step 3: Fuel Up</h2>
+    <p class="text-white text-2xl font-black text-center mb-1">{{ "%.1f"|format(balance) }} $CANDLE</p>
+    <p class="text-[10px] text-slate-400 text-center mb-4">Your starter fuel is ready. You're set to dispatch.</p>
+        <div class="flex justify-center">
+        <button hx-post="/clients/onboarding/complete"
+                hx-target="#onboarding-container"
+                hx-swap="outerHTML"
+                class="bg-green-600 hover:bg-green-500 text-white text-xs font-bold py-2 px-8 rounded-full transition active:scale-95">
+            Continue to Dashboard
+        </button>
+    </div>
+</div>
