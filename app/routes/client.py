@@ -299,10 +299,13 @@ def get_load_board_page(request: Request, user: Optional[Dict] = Depends(current
         if not row:
             return RedirectResponse(url="/drivers/onboarding", status_code=303)
         trucker_id = row[0]
-        scout_row = conn.execute(
-            text("SELECT lanes, min_rpm FROM webwise.scout_status WHERE trucker_id = :tid"),
-            {"tid": trucker_id},
-        ).first()
+        try:
+            scout_row = conn.execute(
+                text("SELECT lanes, min_rpm FROM webwise.scout_status WHERE trucker_id = :tid"),
+                {"tid": trucker_id},
+            ).first()
+        except ProgrammingError:
+            scout_row = None
     scout = {
         "lanes": scout_row[0] if scout_row and scout_row[0] else "",
         "min_rpm": float(scout_row[1]) if scout_row and scout_row[1] is not None else 2.45,
