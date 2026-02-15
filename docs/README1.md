@@ -1,9 +1,9 @@
 134.199.241.56:8990
 134.199.241.56:8990/savings-view
 134.199.241.56:8990/savings-test
-134.199.241.56:8990/faq
+134.199.241.56:8990/drivers/dashboard.html
 134.199.241.56:8990/savings-view 
-
+/srv/projects/client/dispatch/app/templates/drivers/dashboard.html
 cd /srv/projects/client/dispatch
 source .venv/bin/activate
 
@@ -18,7 +18,7 @@ tree /srv/projects/client/dispatch/app/templates/drivers
 # git remote set-url origin https://YOUR_TOKEN@github.com/pgwilde8/dispatch.git
 
 git add -A
-git commit -m "new upgrades and email1"
+git commit -m "dashboards upgrades3"
 git push -u origin main
 
 http://134.199.241.56:8990/admin/login

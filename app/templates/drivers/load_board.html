@@ -13,8 +13,17 @@
     <header class="p-6 bg-slate-900 border-b border-slate-800">
         <div class="max-w-4xl mx-auto">
             <a href="/drivers/dashboard2" class="text-slate-500 hover:text-white text-xs mb-2 inline-block">← Command Center</a>
-            <h1 class="text-2xl font-black text-white tracking-tight">Load Board <span class="text-blue-500">Scout</span></h1>
-            <p class="text-slate-500 text-sm">Configure your AI Scout filters before launching your search.</p>
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-black text-white tracking-tight">Load Board <span class="text-blue-500">Scout</span></h1>
+                    <p class="text-slate-500 text-sm mt-1">Configure your AI Scout filters before launching your search.</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Your Dispatch Identity</p>
+                    <p class="text-white font-bold">{{ trucker.display_name }}@{{ email_domain }}</p>
+                    <p class="text-slate-500 text-xs">MC: {{ trucker.mc_number }}</p>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -65,6 +74,29 @@
                         <a href="https://truckstop.com" target="_blank" rel="noopener noreferrer" class="block w-full bg-slate-800 text-white font-bold py-3 rounded-xl text-xs hover:bg-slate-700 transition text-center">
                             Open Truckstop
                         </a>
+                        <a href="https://app.trucksmarter.com/" target="_blank" rel="noopener noreferrer" class="block w-full bg-slate-800 text-white font-bold py-3 rounded-xl text-xs hover:bg-slate-700 transition text-center">
+                            Open TruckSmarter
+                        </a>
+                    </div>
+                </div>
+
+                <div id="scout-status-container" class="bg-slate-900 border border-slate-800 rounded-3xl p-6"
+                     hx-get="/drivers/scout-status"
+                     hx-trigger="load, every 30s"
+                     hx-swap="innerHTML">
+                    <div class="animate-pulse space-y-3">
+                        <div class="h-4 bg-slate-800 rounded w-1/2"></div>
+                        <div class="h-10 bg-slate-800 rounded w-full"></div>
+                    </div>
+                </div>
+
+                <div id="scout-status-container" class="bg-slate-900 border border-slate-800 rounded-3xl p-6"
+                     hx-get="/drivers/scout-status"
+                     hx-trigger="load, every 30s"
+                     hx-swap="innerHTML">
+                    <div class="animate-pulse space-y-3">
+                        <div class="h-4 bg-slate-800 rounded w-1/2"></div>
+                        <div class="h-10 bg-slate-800 rounded w-full"></div>
                     </div>
                 </div>
 

@@ -42,24 +42,40 @@ def dashboard2(request: Request, user: Optional[Dict] = Depends(current_user)):
         return RedirectResponse(url="/login/client", status_code=303)
     if not engine:
         raise HTTPException(status_code=500, detail="Database not available")
-    with engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT tp.id, tp.display_name, tp.mc_number, tp.scout_api_key
-                FROM webwise.trucker_profiles tp
-                WHERE tp.user_id = :uid
-            """),
-            {"uid": user.get("id")},
-        ).first()
-    if not row:
-        return RedirectResponse(url="/drivers/onboarding", status_code=303)
-    api_key_raw = row[3] if len(row) > 3 else None
+    try:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.scout_api_key
+                    FROM webwise.trucker_profiles tp
+                    WHERE tp.user_id = :uid
+                """),
+                {"uid": user.get("id")},
+            ).first()
+    except ProgrammingError:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT tp.id, tp.display_name, tp.mc_number, NULL, tp.scout_api_key
+                    FROM webwise.trucker_profiles tp
+                    WHERE tp.user_id = :uid
+                """),
+                {"uid": user.get("id")},
+            ).first()
+    # GATEKEEPER: redirect incomplete profiles to onboarding
+    has_display_name = row and (row[1] or "").strip()
+    mc_val = (row[2] or "").strip() if row and len(row) > 2 else ""
+    dot_val = (row[3] or "").strip() if row and len(row) > 3 else ""
+    has_mc_or_dot = bool(mc_val or dot_val)
+    if not row or not has_display_name or not has_mc_or_dot:
+        return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+    api_key_raw = row[4] if row and len(row) > 4 else None
     api_key_display = None
     if api_key_raw and len(api_key_raw) >= 8:
         api_key_display = f"{api_key_raw[:8]}...{api_key_raw[-4:]}" if len(api_key_raw) > 12 else api_key_raw[:8] + "..."
     elif api_key_raw:
         api_key_display = api_key_raw[:4] + "..."
-    trucker = {"id": row[0], "display_name": row[1] or "Driver", "mc_number": row[2] or "—"}
+    trucker = {"id": row[0], "display_name": row[1] or "Driver", "mc_number": mc_val or dot_val or "—"}
     balance = VestingService.get_claimable_balance(engine, trucker["id"])
     balance_val = balance or 0
     # First Mission tutorial: exactly starter balance (10 or 50 $CANDLE) and zero negotiations
@@ -293,12 +309,16 @@ def get_load_board_page(request: Request, user: Optional[Dict] = Depends(current
         raise HTTPException(status_code=500, detail="Database not available")
     with engine.begin() as conn:
         row = conn.execute(
-            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            text("SELECT id, display_name, mc_number FROM webwise.trucker_profiles WHERE user_id = :uid"),
             {"uid": user.get("id")},
         ).first()
         if not row:
-            return RedirectResponse(url="/drivers/onboarding", status_code=303)
+            return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
         trucker_id = row[0]
+        trucker = {
+            "display_name": (row[1] or "").strip() or "Driver",
+            "mc_number": (row[2] or "").strip() or "—",
+        }
         try:
             scout_row = conn.execute(
                 text("SELECT lanes, min_rpm FROM webwise.scout_status WHERE trucker_id = :tid"),
@@ -310,9 +330,10 @@ def get_load_board_page(request: Request, user: Optional[Dict] = Depends(current
         "lanes": scout_row[0] if scout_row and scout_row[0] else "",
         "min_rpm": float(scout_row[1]) if scout_row and scout_row[1] is not None else 2.45,
     }
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
     return templates.TemplateResponse(
         "drivers/load_board.html",
-        {"request": request, "scout": scout},
+        {"request": request, "scout": scout, "trucker": trucker, "email_domain": email_domain},
     )
 
 
@@ -339,18 +360,24 @@ async def scout_update_filters(
         if not row:
             raise HTTPException(status_code=403, detail="Trucker profile not found")
         trucker_id = row[0]
-        conn.execute(
-            text("""
-                INSERT INTO webwise.scout_status (trucker_id, lanes, min_rpm, active, updated_at)
-                VALUES (:tid, :lanes, :min_rpm, true, now())
-                ON CONFLICT (trucker_id) DO UPDATE SET
-                    lanes = EXCLUDED.lanes,
-                    min_rpm = EXCLUDED.min_rpm,
-                    active = true,
-                    updated_at = now()
-            """),
-            {"tid": trucker_id, "lanes": lanes, "min_rpm": min_rpm},
-        )
+        try:
+            conn.execute(
+                text("""
+                    INSERT INTO webwise.scout_status (trucker_id, lanes, min_rpm, active, updated_at)
+                    VALUES (:tid, :lanes, :min_rpm, true, now())
+                    ON CONFLICT (trucker_id) DO UPDATE SET
+                        lanes = EXCLUDED.lanes,
+                        min_rpm = EXCLUDED.min_rpm,
+                        active = true,
+                        updated_at = now()
+                """),
+                {"tid": trucker_id, "lanes": lanes, "min_rpm": min_rpm},
+            )
+        except ProgrammingError:
+            return HTMLResponse(
+                content="<span class='text-amber-500 text-xs'>Scout table not ready. Run: psql $DATABASE_URL -f sql/migrate_add_missing_schema.sql</span>",
+                status_code=503,
+            )
     return HTMLResponse(
         content="<span class='text-green-500 text-xs'>Configuration saved.</span>",
         headers={"HX-Trigger": "scoutFiltersSaved"},
@@ -480,6 +507,40 @@ def fleet_fuel_audit(request: Request, user: Optional[Dict] = Depends(current_us
             "total_booked": total_booked,
             "error": None,
         },
+    )
+
+
+@router.get("/drivers/onboarding", response_class=HTMLResponse)
+def onboarding_redirect(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Legacy redirect — /drivers/onboarding -> /drivers/onboarding/welcome."""
+    return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+
+
+@router.get("/drivers/onboarding/welcome", response_class=HTMLResponse)
+def onboarding_welcome(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Mission Readiness page — Progressive Stepper. Gatekeeper redirect target for incomplete profiles."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    # Check profile: if needs step 1 (create email), render it directly so it's always visible
+    needs_step1 = True
+    if engine:
+        try:
+            with engine.begin() as conn:
+                row = conn.execute(
+                    text("SELECT display_name, mc_number, dot_number, is_first_login FROM webwise.trucker_profiles WHERE user_id = :uid"),
+                    {"uid": user.get("id")},
+                ).first()
+            if row:
+                has_handle = bool((row[0] or "").strip())
+                has_mc = bool((row[1] or "").strip() or (row[2] or "").strip())
+                if has_handle and has_mc:
+                    needs_step1 = False  # Will load step 2/3 or active load via HTMX
+        except Exception:
+            pass
+    return templates.TemplateResponse(
+        "drivers/onboarding_welcome.html",
+        {"request": request, "email_domain": email_domain, "needs_step1": needs_step1},
     )
 
 
@@ -2253,20 +2314,26 @@ def view_savings_page(request: Request, user: Optional[Dict] = Depends(current_u
         with engine.begin() as conn:
             r = conn.execute(
                 text("""
-                    SELECT tp.id, tp.mc_number, tp.dot_number, tp.authority_type, tp.reward_tier, tp.wallet_address
+                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, tp.reward_tier, tp.wallet_address
                     FROM webwise.trucker_profiles tp
                     WHERE tp.user_id = :uid
                 """),
                 {"uid": user.get("id")},
             )
             row = r.first()
-            if row:
-                trucker_id = row.id
-                mc_number = row.mc_number
-                dot_number = row.dot_number
-                authority_type = row.authority_type or "MC"
-                reward_tier = row.reward_tier or "STANDARD"
-                wallet_address = row.wallet_address
+            if not row:
+                return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+            trucker_id = row.id
+            mc_number = row.mc_number
+            dot_number = row.dot_number
+            authority_type = row.authority_type or "MC"
+            reward_tier = row.reward_tier or "STANDARD"
+            wallet_address = row.wallet_address
+            # Gatekeeper: incomplete profiles go to onboarding
+            has_display_name = (getattr(row, "display_name", None) or "").strip()
+            has_mc_or_dot = bool((mc_number or "").strip() or (dot_number or "").strip())
+            if not has_display_name or not has_mc_or_dot:
+                return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
     
     # Initialize portfolio stats (will be empty if no MC or engine)
     from app.services.token_price import TokenPriceService

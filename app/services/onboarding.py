@@ -3,6 +3,7 @@ Onboarding Service: Finalizes driver setup after Stripe payment.
 Tiered: Solo ($25/10 $CANDLE) vs Small Fleet ($99/50 $CANDLE).
 """
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 from decimal import Decimal
 from typing import Literal
 import os
@@ -50,25 +51,47 @@ def onboard_new_driver(
         ).first()
         if row:
             trucker_id = row[0]
-            conn.execute(
-                text("""
-                    UPDATE webwise.trucker_profiles
-                    SET mc_number = :mc, dot_number = :dot, display_name = :dn,
-                        updated_at = now(), is_first_login = true
-                    WHERE user_id = :uid
-                """),
-                {"mc": mc_number, "dot": dot_number, "dn": display_name, "uid": user_id},
-            )
+            try:
+                conn.execute(
+                    text("""
+                        UPDATE webwise.trucker_profiles
+                        SET mc_number = :mc, dot_number = :dot, display_name = :dn,
+                            updated_at = now(), is_first_login = true
+                        WHERE user_id = :uid
+                    """),
+                    {"mc": mc_number, "dot": dot_number, "dn": display_name, "uid": user_id},
+                )
+            except ProgrammingError:
+                conn.execute(
+                    text("""
+                        UPDATE webwise.trucker_profiles
+                        SET mc_number = :mc, dot_number = :dot, display_name = :dn,
+                            updated_at = now()
+                        WHERE user_id = :uid
+                    """),
+                    {"mc": mc_number, "dot": dot_number, "dn": display_name, "uid": user_id},
+                )
         else:
-            r = conn.execute(
-                text("""
-                    INSERT INTO webwise.trucker_profiles (user_id, display_name, mc_number, dot_number, is_first_login)
-                    VALUES (:uid, :dn, :mc, :dot, true)
-                    RETURNING id
-                """),
-                {"uid": user_id, "dn": display_name, "mc": mc_number, "dot": dot_number},
-            )
-            trucker_id = r.scalar()
+            try:
+                r = conn.execute(
+                    text("""
+                        INSERT INTO webwise.trucker_profiles (user_id, display_name, mc_number, dot_number, is_first_login)
+                        VALUES (:uid, :dn, :mc, :dot, true)
+                        RETURNING id
+                    """),
+                    {"uid": user_id, "dn": display_name, "mc": mc_number, "dot": dot_number},
+                )
+                trucker_id = r.scalar()
+            except ProgrammingError:
+                r = conn.execute(
+                    text("""
+                        INSERT INTO webwise.trucker_profiles (user_id, display_name, mc_number, dot_number)
+                        VALUES (:uid, :dn, :mc, :dot)
+                        RETURNING id
+                    """),
+                    {"uid": user_id, "dn": display_name, "mc": mc_number, "dot": dot_number},
+                )
+                trucker_id = r.scalar()
 
         # 2. Issue tiered Starter Credit (STARTER_PACK vs FLEET_STARTER_PACK for back-office)
         conn.execute(

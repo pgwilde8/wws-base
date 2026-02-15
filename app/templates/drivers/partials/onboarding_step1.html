@@ -1,12 +1,17 @@
-<div class="bg-slate-900 border-2 border-dashed border-slate-700 rounded-2xl p-6" id="onboarding-container">
+<div class="space-y-6" id="onboarding-container">
+    <div class="p-6 bg-slate-900/50 border border-slate-800 rounded-2xl">
+        <h2 class="text-lg font-bold text-white mb-2">Step 1: Create Your Dispatch Email</h2>
+        <p class="text-slate-400 text-sm">This is the professional email brokers will see when our AI Scout negotiates loads for you. Pick a handle (like <span class="text-blue-400 font-mono">yourname</span>) and you'll get <span class="text-blue-400 font-mono">yourname@{{ email_domain }}</span>. This becomes your identity in every negotiation.</p>
+    </div>
+    <div class="bg-slate-900 border-2 border-dashed border-slate-700 rounded-2xl p-6">
     <form id="handle-form" class="space-y-4">
         <div class="flex items-center justify-center gap-2 mb-4">
             <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">1</span>
             <span class="bg-slate-700 text-slate-400 text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center">2</span>
             <span class="bg-slate-700 text-slate-400 text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center">3</span>
         </div>
-        <h2 class="text-green-400 font-bold mb-1 text-center">Step 1: Secure Your Identity</h2>
-        <p class="text-[10px] text-slate-500 mb-4 text-center">Choose the handle brokers will see in negotiations.</p>
+        <h3 class="text-green-400 font-bold mb-1 text-center">Choose Your Handle</h3>
+        <p class="text-[10px] text-slate-500 mb-4 text-center">Enter your handle below. You'll get <span class="text-blue-400 font-mono">handle@{{ email_domain }}</span></p>
 
         <div class="relative max-w-xs mx-auto">
             <input type="text"
@@ -37,4 +42,5 @@
             </button>
         </div>
     </form>
+    </div>
 </div>

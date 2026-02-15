@@ -1,11 +1,40 @@
-<div class="bg-gradient-to-br from-slate-900 to-black rounded-3xl border-2 border-green-500/30 p-8 shadow-2xl animate-bounce-in" id="onboarding-container">
+<div class="space-y-6" id="onboarding-container">
+    <div class="p-6 bg-slate-900/50 border border-slate-800 rounded-2xl">
+        <h2 class="text-lg font-bold text-white mb-2">Step 3: Activate Your Command Center</h2>
+        <p class="text-slate-400 text-sm">Your automation fuel is loaded. $CANDLE powers every action Scout takes—emails, calls, negotiations. Click START MISSION below to enter your Command Center and deploy Scout on your load board.</p>
+    </div>
+    <div class="bg-gradient-to-br from-slate-900 to-black rounded-3xl border-2 border-green-500/30 p-8 shadow-2xl animate-bounce-in">
     <div class="flex items-center justify-center gap-3 mb-6">
         <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">✓</span>
         <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">✓</span>
         <span class="bg-blue-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center ring-4 ring-blue-500/20">3</span>
     </div>
 
-    <h2 class="text-white text-xl font-bold mb-1 text-center">Systems Activated</h2>
+    <h3 class="text-white text-xl font-bold mb-1 text-center">Systems Activated</h3>
+
+    <div class="my-6 p-6 bg-blue-900/20 border border-blue-500/30 rounded-2xl">
+        <h4 class="text-green-500 font-bold text-lg mb-1">✅ Office Established: {{ display_name }}@{{ email_domain }}</h4>
+        <p class="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-4">How to use your new identity</p>
+        <ul class="space-y-3 text-xs text-slate-400">
+            <li class="flex gap-2">
+                <span class="text-blue-500 shrink-0">•</span>
+                <span><strong class="text-slate-300">Zero Login Required:</strong> You don't need a password for this email. Our AI Dispatcher lives inside this inbox 24/7.</span>
+            </li>
+            <li class="flex gap-2">
+                <span class="text-blue-500 shrink-0">•</span>
+                <span><strong class="text-slate-300">Automatic Routing:</strong> When you click a load on DAT, the AI sends the email from this address.</span>
+            </li>
+            <li class="flex gap-2">
+                <span class="text-blue-500 shrink-0">•</span>
+                <span><strong class="text-slate-300">Instant Notifications:</strong> When a broker replies, you'll see it pop up right here on your Command Center dashboard.</span>
+            </li>
+            <li class="flex gap-2">
+                <span class="text-blue-500 shrink-0">•</span>
+                <span><strong class="text-slate-300">Professional Edge:</strong> Brokers see a professional domain, which helps you get higher rates than a generic Gmail.</span>
+            </li>
+        </ul>
+    </div>
+
     <div class="py-6 my-4 bg-black/50 rounded-2xl border border-slate-800 text-center">
         <p class="text-[10px] text-blue-400 uppercase font-black tracking-widest mb-1">Automation Fuel Loaded</p>
         <p class="text-5xl font-black text-white neon-text mb-1">{{ "%.1f"|format(balance) }}</p>
@@ -37,5 +66,6 @@
             <span>START MISSION</span>
             <i class="fas fa-arrow-right text-xs"></i>
         </button>
+    </div>
     </div>
 </div>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission Readiness — GCD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .mission-tutorial-fade { animation: fadeIn 0.3s ease-out forwards; }
+        body { background-color: #020617; }
+    </style>
+</head>
+<body class="text-slate-200 font-sans min-h-screen bg-slate-950">
+
+    <div class="max-w-2xl mx-auto py-12 px-4 mission-tutorial-fade">
+        <div class="text-center mb-10">
+            <h1 class="text-3xl font-black text-white tracking-tighter">Welcome, <span class="text-blue-500">Driver</span></h1>
+            <p class="text-slate-400 text-sm mt-2">Let's get your AI Command Center ready. Complete the step below to continue.</p>
+        </div>
+
+        <div id="onboarding-step-container">
+            {% if needs_step1 %}
+            {% include "drivers/partials/onboarding_step1.html" %}
+            {% else %}
+            <div id="onboarding-step-dynamic"
+                 hx-get="/drivers/dashboard-mission"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center animate-pulse">
+                    <div class="text-slate-500">Loading...</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</body>
+</html>
