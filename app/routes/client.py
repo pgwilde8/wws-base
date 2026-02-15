@@ -7,6 +7,8 @@ from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 from datetime import datetime
 
+from sqlalchemy.exc import ProgrammingError
+
 from app.core.deps import templates, current_user, engine, get_db
 from app.services.ai_agent import AIAgentService
 from app.services.negotiation import save_negotiation
@@ -129,10 +131,13 @@ def scout_status(request: Request, user: Optional[Dict] = Depends(current_user))
         if not row:
             return HTMLResponse(content="")
         trucker_id = row[0]
-        status_row = conn.execute(
-            text("SELECT lanes, min_rpm, active FROM webwise.scout_status WHERE trucker_id = :tid"),
-            {"tid": trucker_id},
-        ).first()
+        try:
+            status_row = conn.execute(
+                text("SELECT lanes, min_rpm, active FROM webwise.scout_status WHERE trucker_id = :tid"),
+                {"tid": trucker_id},
+            ).first()
+        except ProgrammingError:
+            status_row = None
     scout = {
         "lanes": status_row[0] if status_row else "",
         "lanes_display": (status_row[0] or "").replace(",", " ⮕ ") if status_row and status_row[0] else "NJ ⮕ FL, GA, SC",
@@ -164,19 +169,34 @@ def dashboard_active_loads(request: Request, user: Optional[Dict] = Depends(curr
     trucker_id = row.id
     display_name = (row.display_name or "").strip().lower()
 
-    with engine.begin() as conn:
-        negotiations = conn.execute(
-            text("""
-                SELECT n.id, n.load_id, n.origin, n.destination, n.original_rate, n.target_rate,
-                       n.status, n.created_at, n.assigned_truck
-                FROM webwise.negotiations n
-                WHERE n.trucker_id = :trucker_id
-                AND n.status IN ('sent', 'replied', 'pending')
-                ORDER BY n.updated_at DESC NULLS LAST, n.created_at DESC
-                LIMIT 5
-            """),
-            {"trucker_id": trucker_id},
-        ).fetchall()
+    try:
+        with engine.begin() as conn:
+            negotiations = conn.execute(
+                text("""
+                    SELECT n.id, n.load_id, n.origin, n.destination, n.original_rate, n.target_rate,
+                           n.status, n.created_at, n.assigned_truck
+                    FROM webwise.negotiations n
+                    WHERE n.trucker_id = :trucker_id
+                    AND n.status IN ('sent', 'replied', 'pending')
+                    ORDER BY n.updated_at DESC NULLS LAST, n.created_at DESC
+                    LIMIT 5
+                """),
+                {"trucker_id": trucker_id},
+            ).fetchall()
+    except ProgrammingError:
+        with engine.begin() as conn:
+            negotiations = conn.execute(
+                text("""
+                    SELECT n.id, n.load_id, n.origin, n.destination, n.original_rate, n.target_rate,
+                           n.status, n.created_at, NULL
+                    FROM webwise.negotiations n
+                    WHERE n.trucker_id = :trucker_id
+                    AND n.status IN ('sent', 'replied', 'pending')
+                    ORDER BY n.updated_at DESC NULLS LAST, n.created_at DESC
+                    LIMIT 5
+                """),
+                {"trucker_id": trucker_id},
+            ).fetchall()
 
     if not negotiations:
         return _dashboard_active_loads_empty(request)
@@ -261,6 +281,76 @@ def _dashboard_active_loads_empty(request: Request, balance: float = 10.0) -> HT
     return templates.TemplateResponse(
         "drivers/partials/dashboard_active_loads_empty.html",
         {"request": request, "balance": balance},
+    )
+
+
+@router.get("/drivers/load-board", response_class=HTMLResponse)
+def get_load_board_page(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Scout Configuration & Quick-Launch — Pre-Flight Checklist before DAT/Truckstop."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not available")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            return RedirectResponse(url="/drivers/onboarding", status_code=303)
+        trucker_id = row[0]
+        scout_row = conn.execute(
+            text("SELECT lanes, min_rpm FROM webwise.scout_status WHERE trucker_id = :tid"),
+            {"tid": trucker_id},
+        ).first()
+    scout = {
+        "lanes": scout_row[0] if scout_row and scout_row[0] else "",
+        "min_rpm": float(scout_row[1]) if scout_row and scout_row[1] is not None else 2.45,
+    }
+    return templates.TemplateResponse(
+        "drivers/load_board.html",
+        {"request": request, "scout": scout},
+    )
+
+
+@router.post("/drivers/scout/update-filters", response_class=HTMLResponse)
+async def scout_update_filters(
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Save Scout search parameters (lanes, min_rpm). HTMX form submit."""
+    if not user or user.get("role") != "client" or not engine:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    form = await request.form()
+    lanes = (form.get("lanes") or "").strip()
+    min_rpm_str = form.get("min_rpm") or "2.45"
+    try:
+        min_rpm = float(min_rpm_str) if min_rpm_str else 2.45
+    except (ValueError, TypeError):
+        min_rpm = 2.45
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            raise HTTPException(status_code=403, detail="Trucker profile not found")
+        trucker_id = row[0]
+        conn.execute(
+            text("""
+                INSERT INTO webwise.scout_status (trucker_id, lanes, min_rpm, active, updated_at)
+                VALUES (:tid, :lanes, :min_rpm, true, now())
+                ON CONFLICT (trucker_id) DO UPDATE SET
+                    lanes = EXCLUDED.lanes,
+                    min_rpm = EXCLUDED.min_rpm,
+                    active = true,
+                    updated_at = now()
+            """),
+            {"tid": trucker_id, "lanes": lanes, "min_rpm": min_rpm},
+        )
+    return HTMLResponse(
+        content="<span class='text-green-500 text-xs'>Configuration saved.</span>",
+        headers={"HX-Trigger": "scoutFiltersSaved"},
     )
 
 
@@ -561,15 +651,26 @@ def dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_u
     """
     if not user or user.get("role") != "client" or not engine:
         return HTMLResponse(content="")
-    with engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, tp.is_first_login
-                FROM webwise.trucker_profiles tp
-                WHERE tp.user_id = :uid
-            """),
-            {"uid": user.get("id")},
-        ).first()
+    try:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, tp.is_first_login
+                    FROM webwise.trucker_profiles tp
+                    WHERE tp.user_id = :uid
+                """),
+                {"uid": user.get("id")},
+            ).first()
+    except ProgrammingError:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, false
+                    FROM webwise.trucker_profiles tp
+                    WHERE tp.user_id = :uid
+                """),
+                {"uid": user.get("id")},
+            ).first()
     email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
     needs_handle = not row or not (row.display_name or "").strip()
     has_mc_or_dot = row and ((row.mc_number or "").strip() or (row.dot_number or "").strip())
@@ -603,15 +704,22 @@ def welcome_fuel_banner(request: Request, user: Optional[Dict] = Depends(current
     """
     if not user or user.get("role") != "client" or not engine:
         return HTMLResponse(content="")
-    with engine.begin() as conn:
-        row = conn.execute(
-            text("""
-                SELECT tp.id, tp.is_first_login, tp.mc_number
-                FROM webwise.trucker_profiles tp
-                WHERE tp.user_id = :uid
-            """),
-            {"uid": user.get("id")},
-        ).first()
+    try:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT tp.id, tp.is_first_login, tp.mc_number
+                    FROM webwise.trucker_profiles tp
+                    WHERE tp.user_id = :uid
+                """),
+                {"uid": user.get("id")},
+            ).first()
+    except ProgrammingError:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT tp.id, false, tp.mc_number FROM webwise.trucker_profiles tp WHERE tp.user_id = :uid"),
+                {"uid": user.get("id")},
+            ).first()
     if not row:
         return HTMLResponse(content="")
     trucker_id, is_first_login, mc_number = row[0], row[1], row[2]
