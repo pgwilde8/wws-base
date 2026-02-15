@@ -135,6 +135,19 @@ def run_bootstrap():
                     ALTER TABLE webwise.users ADD COLUMN location_code VARCHAR(50);
                     CREATE INDEX IF NOT EXISTS idx_users_location_code ON webwise.users(location_code);
                 END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'users' 
+                               AND column_name = 'referral_code') THEN
+                    ALTER TABLE webwise.users ADD COLUMN referral_code VARCHAR(20) UNIQUE;
+                    CREATE INDEX IF NOT EXISTS idx_users_referral_code ON webwise.users(referral_code);
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'users' 
+                               AND column_name = 'referred_by') THEN
+                    ALTER TABLE webwise.users ADD COLUMN referred_by VARCHAR(20);
+                END IF;
             END $$;
         """))
         conn.execute(text("""
@@ -417,6 +430,16 @@ def run_bootstrap():
         """))
         conn.execute(text("""
             CREATE INDEX IF NOT EXISTS idx_broker_emails_email ON webwise.broker_emails(email);
+        """))
+        # Scout extension heartbeat: lanes, min_rpm, active status per trucker
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.scout_status (
+                trucker_id INTEGER PRIMARY KEY REFERENCES webwise.trucker_profiles(id) ON DELETE CASCADE,
+                lanes TEXT,
+                min_rpm FLOAT,
+                active BOOLEAN DEFAULT false,
+                updated_at TIMESTAMP DEFAULT now()
+            );
         """))
         # Auto-Pilot: per-driver per-load guardrails
         conn.execute(text("""

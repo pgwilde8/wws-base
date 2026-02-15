@@ -14,7 +14,7 @@
         </div>
         
         {% if wallet_address %}
-        <form hx-post="/clients/claim/request" 
+        <form hx-post="/drivers/claim/request" 
               hx-target="#claim-modal-container"
               hx-swap="innerHTML"
               class="space-y-4">
@@ -36,7 +36,7 @@
                 </button>
                 <div class="text-center text-[10px] text-slate-500">OR</div>
                 <button type="button"
-                        hx-post="/clients/claim/reinvest"
+                        hx-post="/drivers/claim/reinvest"
                         hx-target="#claim-modal-container"
                         hx-swap="innerHTML"
                         class="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-black font-black uppercase text-sm py-3 px-4 rounded-xl transition">
@@ -52,7 +52,7 @@
         {% else %}
         <div class="text-center py-4">
             <p class="text-slate-400 text-sm mb-4">Please set up your wallet address first.</p>
-            <button hx-get="/clients/wallet/setup-modal"
+            <button hx-get="/drivers/wallet/setup-modal"
                     hx-target="#claim-modal-container"
                     hx-swap="innerHTML"
                     class="bg-amber-600 hover:bg-amber-500 text-black font-black uppercase text-sm py-3 px-4 rounded-xl">

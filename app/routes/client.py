@@ -26,14 +26,233 @@ from app.schemas.load import LoadResponse, LoadStatus
 router = APIRouter()
 
 
-@router.get("/clients/dashboard")
+@router.get("/drivers/dashboard")
 def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_user)):
     if not user or user.get("role") != "client":
         return RedirectResponse(url="/login/client", status_code=303)
     return templates.TemplateResponse("drivers/dashboard.html", {"request": request, "user": user})
 
 
-@router.get("/clients/fleet", response_class=HTMLResponse)
+@router.get("/drivers/dashboard2", response_class=HTMLResponse)
+def dashboard2(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """GCD Command Center - Live Play-by-Play dashboard with Active Negotiations."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not available")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("""
+                SELECT tp.id, tp.display_name, tp.mc_number
+                FROM webwise.trucker_profiles tp
+                WHERE tp.user_id = :uid
+            """),
+            {"uid": user.get("id")},
+        ).first()
+    if not row:
+        return RedirectResponse(url="/drivers/onboarding", status_code=303)
+    trucker = {"id": row[0], "display_name": row[1] or "Driver", "mc_number": row[2] or "—"}
+    balance = VestingService.get_claimable_balance(engine, trucker["id"])
+    balance_val = balance or 0
+    # First Mission tutorial: exactly starter balance (10 or 50 $CANDLE) and zero negotiations
+    is_new_driver = False
+    if round(balance_val, 1) in (10.0, 50.0):
+        with engine.begin() as conn:
+            neg_count = conn.execute(
+                text("SELECT COUNT(*) FROM webwise.negotiations WHERE trucker_id = :tid"),
+                {"tid": trucker["id"]},
+            ).scalar()
+            is_new_driver = (neg_count or 0) == 0
+    return templates.TemplateResponse(
+        "drivers/dashboard2.html",
+        {"request": request, "trucker": trucker, "balance": balance_val, "is_new_driver": is_new_driver},
+    )
+
+
+@router.get("/drivers/partials/first-mission", response_class=HTMLResponse)
+def first_mission_modal(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """
+    HTMX: Returns First Mission tutorial modal for rookies.
+    Only shown when balance is starter (10 or 50) and zero negotiations.
+    """
+    if not user or user.get("role") != "client" or not engine:
+        return HTMLResponse(content="")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            return HTMLResponse(content="")
+        trucker_id = row[0]
+    balance = VestingService.get_claimable_balance(engine, trucker_id) or 0
+    if round(balance, 1) not in (10.0, 50.0):
+        return HTMLResponse(content="")
+    with engine.begin() as conn:
+        neg_count = conn.execute(
+            text("SELECT COUNT(*) FROM webwise.negotiations WHERE trucker_id = :tid"),
+            {"tid": trucker_id},
+        ).scalar()
+    if (neg_count or 0) > 0:
+        return HTMLResponse(content="")
+    return templates.TemplateResponse(
+        "drivers/partials/first_mission_modal.html",
+        {"request": request, "balance": balance},
+    )
+
+
+@router.get("/drivers/scout-status", response_class=HTMLResponse)
+def scout_status(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """
+    HTMX: Returns Live Intelligence box with Scout heartbeat data.
+    Polled by dashboard2 every 60s. Shows ACTIVE/IDLE, lanes, target RPM.
+    """
+    if not user or user.get("role") != "client" or not engine:
+        return HTMLResponse(content="")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            return HTMLResponse(content="")
+        trucker_id = row[0]
+        status_row = conn.execute(
+            text("SELECT lanes, min_rpm, active FROM webwise.scout_status WHERE trucker_id = :tid"),
+            {"tid": trucker_id},
+        ).first()
+    scout = {
+        "lanes": status_row[0] if status_row else "",
+        "lanes_display": (status_row[0] or "").replace(",", " ⮕ ") if status_row and status_row[0] else "NJ ⮕ FL, GA, SC",
+        "min_rpm": float(status_row[1]) if status_row and status_row[1] is not None else 2.45,
+        "active": bool(status_row[2]) if status_row and status_row[2] is not None else False,
+    }
+    return templates.TemplateResponse(
+        "drivers/partials/scout_status.html",
+        {"request": request, "scout": scout},
+    )
+
+
+@router.get("/drivers/dashboard-active-loads", response_class=HTMLResponse)
+def dashboard_active_loads(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """
+    HTMX: Returns active negotiation card(s) or 'Scanning for Opportunities' placeholder.
+    Fetches in-progress negotiations (status in sent, replied, pending) with broker offer,
+    AI target, mini-timeline, and action buttons.
+    """
+    if not user or user.get("role") != "client" or not engine:
+        return _dashboard_active_loads_empty(request)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+    if not row or not (row.display_name or "").strip():
+        return _dashboard_active_loads_empty(request)
+    trucker_id = row.id
+    display_name = (row.display_name or "").strip().lower()
+
+    with engine.begin() as conn:
+        negotiations = conn.execute(
+            text("""
+                SELECT n.id, n.load_id, n.origin, n.destination, n.original_rate, n.target_rate,
+                       n.status, n.created_at, n.assigned_truck
+                FROM webwise.negotiations n
+                WHERE n.trucker_id = :trucker_id
+                AND n.status IN ('sent', 'replied', 'pending')
+                ORDER BY n.updated_at DESC NULLS LAST, n.created_at DESC
+                LIMIT 5
+            """),
+            {"trucker_id": trucker_id},
+        ).fetchall()
+
+    if not negotiations:
+        return _dashboard_active_loads_empty(request)
+
+    loads_data = []
+    for neg in negotiations:
+        load_id = str(neg.load_id or "").strip() if neg.load_id else ""
+        if not load_id:
+            continue
+
+        msgs = []
+        with engine.begin() as conn2:
+            msg_rows = conn2.execute(
+                text("""
+                    SELECT sender_email, body_text, received_at, created_at
+                    FROM webwise.messages
+                    WHERE LOWER(SPLIT_PART(SPLIT_PART(recipient_tagged, '@', 1), '+', 1)) = :dn
+                    AND load_id = :load_id
+                    ORDER BY COALESCE(received_at, created_at) DESC NULLS LAST
+                    LIMIT 5
+                """),
+                {"dn": display_name, "load_id": load_id},
+            ).fetchall()
+
+        broker_offer = None
+        broker_ready = False
+        timeline = []
+        neg_created = neg.created_at
+        if neg_created:
+            ts = neg_created.strftime("%I:%M %p").lstrip("0") if hasattr(neg_created, "strftime") else str(neg_created)
+            timeline.append({"time": ts, "text": "Scout engaged load. Initial inquiry sent.", "cost": "0.1"})
+
+        for m in reversed(list(msg_rows)):
+            ts = "—"
+            dt = getattr(m, "received_at", None) or getattr(m, "created_at", None)
+            if dt and hasattr(dt, "strftime"):
+                ts = dt.strftime("%I:%M %p").lstrip("0")
+            parsed = extract_bid_details(m.body_text or "")
+            if parsed.get("extracted_offer") is not None:
+                broker_offer = parsed["extracted_offer"]
+            broker_ready = parsed.get("broker_ready", False)
+            timeline.append({"time": ts, "text": "Broker replied. AI countering with Market Intel."})
+            if len(timeline) >= 3:
+                break
+
+        timeline = timeline[-3:]
+        target = float(neg.target_rate) if neg.target_rate else (float(broker_offer or 0) + 150 if broker_offer else 0)
+        broker_offer = broker_offer or neg.original_rate
+        broker_offer = float(broker_offer) if broker_offer else 0
+        gap = target - broker_offer if broker_offer and target else 0
+
+        status_badge = "🤖 AI COUNTERING" if neg.status == "replied" else "📩 BROKER REPLIED" if neg.status == "sent" else "⏳ NEGOTIATING"
+        if broker_ready:
+            status_badge = "📩 RATE CON RECEIVED"
+
+        loads_data.append({
+            "id": neg.id,
+            "load_id": load_id,
+            "origin": neg.origin or "Unknown",
+            "destination": neg.destination or "Unknown",
+            "broker_offer": broker_offer,
+            "target_rate": target,
+            "profit_gap": gap,
+            "status": neg.status,
+            "status_badge": status_badge,
+            "timeline": timeline,
+            "assigned_truck": neg.assigned_truck,
+        })
+
+    if not loads_data:
+        balance = VestingService.get_claimable_balance(engine, trucker_id) if trucker_id else 0
+        return _dashboard_active_loads_empty(request, balance or 0)
+
+    return templates.TemplateResponse(
+        "drivers/partials/active_load_card.html",
+        {"request": request, "loads": loads_data},
+    )
+
+
+def _dashboard_active_loads_empty(request: Request, balance: float = 10.0) -> HTMLResponse:
+    """Placeholder when no active negotiations. Balance drives 'Your X.X $CANDLE fuel' message."""
+    return templates.TemplateResponse(
+        "drivers/partials/dashboard_active_loads_empty.html",
+        {"request": request, "balance": balance},
+    )
+
+
+@router.get("/drivers/fleet", response_class=HTMLResponse)
 def fleet_fuel_audit(request: Request, user: Optional[Dict] = Depends(current_user)):
     """
     Fleet Fuel Audit: per-truck consumption report for fleet managers.
@@ -147,7 +366,7 @@ def fleet_fuel_audit(request: Request, user: Optional[Dict] = Depends(current_us
     )
 
 
-@router.get("/clients/onboarding/check-handle", response_class=HTMLResponse)
+@router.get("/drivers/onboarding/check-handle", response_class=HTMLResponse)
 def onboarding_check_handle(
     request: Request,
     handle: str = "",
@@ -190,7 +409,7 @@ def onboarding_check_handle(
     )
 
 
-@router.post("/clients/onboarding/claim-handle", response_class=HTMLResponse)
+@router.post("/drivers/onboarding/claim-handle", response_class=HTMLResponse)
 def onboarding_claim_handle(
     request: Request,
     handle: str = Form(""),
@@ -236,7 +455,7 @@ def onboarding_claim_handle(
     )
 
 
-@router.post("/clients/onboarding/claim-mc", response_class=HTMLResponse)
+@router.post("/drivers/onboarding/claim-mc", response_class=HTMLResponse)
 def onboarding_claim_mc(
     request: Request,
     mc_number: str = Form(""),
@@ -244,18 +463,43 @@ def onboarding_claim_mc(
     authority_type: str = Form("MC"),
     user: Optional[Dict] = Depends(current_user),
 ):
-    """Step 2: Save MC/DOT and issue starter credits."""
+    """Step 2: Save MC/DOT and issue starter credits. Returns Step 3 or Step 2 with error."""
     if not user or user.get("role") != "client" or not engine:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    mc_clean = (mc_number or "").strip()
-    dot_clean = (dot_number or "").strip()
+    mc_clean = (mc_number or "").strip().replace(" ", "")
+    dot_clean = (dot_number or "").strip().replace(" ", "")
     auth_type = (authority_type or "MC").strip().upper()
     if auth_type not in ("MC", "DOT"):
         auth_type = "MC"
-    if auth_type == "MC" and not mc_clean:
-        raise HTTPException(status_code=400, detail="MC Number is required")
-    if auth_type == "DOT" and not dot_clean:
-        raise HTTPException(status_code=400, detail="DOT Number is required")
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    display_name = ""
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row or not (row.display_name or "").strip():
+            raise HTTPException(status_code=400, detail="Complete Step 1 first")
+        display_name = (row.display_name or "").strip().lower()
+    if auth_type == "MC":
+        if not mc_clean:
+            return templates.TemplateResponse(
+                "drivers/partials/onboarding_step2.html",
+                {"request": request, "email_domain": email_domain, "display_name": display_name, "error": "MC Number is required."},
+            )
+        mc_digits = "".join(c for c in mc_clean if c.isdigit())
+        if len(mc_digits) < 6 or len(mc_digits) > 8:
+            return templates.TemplateResponse(
+                "drivers/partials/onboarding_step2.html",
+                {"request": request, "email_domain": email_domain, "display_name": display_name, "error": "MC Number must be 6–8 digits."},
+            )
+        mc_clean = mc_digits
+    else:
+        if not dot_clean:
+            return templates.TemplateResponse(
+                "drivers/partials/onboarding_step2.html",
+                {"request": request, "email_domain": email_domain, "display_name": display_name, "error": "DOT Number is required."},
+            )
     with engine.begin() as conn:
         row = conn.execute(
             text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
@@ -285,7 +529,7 @@ def onboarding_claim_mc(
     )
 
 
-@router.get("/clients/dashboard-mission", response_class=HTMLResponse)
+@router.get("/drivers/dashboard-mission", response_class=HTMLResponse)
 def dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_user)):
     """
     Returns onboarding stepper (if incomplete) or active-load widget.
@@ -327,7 +571,7 @@ def dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_u
     return active_load(request, user)
 
 
-@router.get("/clients/welcome-fuel-banner", response_class=HTMLResponse)
+@router.get("/drivers/welcome-fuel-banner", response_class=HTMLResponse)
 def welcome_fuel_banner(request: Request, user: Optional[Dict] = Depends(current_user)):
     """
     HTMX: Returns "Your Robot is Fueled Up" banner when is_first_login and balance > 0.
@@ -359,7 +603,7 @@ def welcome_fuel_banner(request: Request, user: Optional[Dict] = Depends(current
     )
 
 
-@router.post("/clients/dismiss-first-login", response_class=HTMLResponse)
+@router.post("/drivers/dismiss-first-login", response_class=HTMLResponse)
 def dismiss_first_login(request: Request, user: Optional[Dict] = Depends(current_user)):
     """HTMX: Sets is_first_login = false, returns empty (removes banner)."""
     if not user or user.get("role") != "client" or not engine:
@@ -372,20 +616,22 @@ def dismiss_first_login(request: Request, user: Optional[Dict] = Depends(current
     return HTMLResponse(content="")
 
 
-@router.post("/clients/onboarding/complete", response_class=HTMLResponse)
+@router.post("/drivers/onboarding/complete", response_class=HTMLResponse)
 def onboarding_complete(request: Request, user: Optional[Dict] = Depends(current_user)):
-    """Dismiss first login and return the mission widget (active load)."""
+    """Dismiss first login and redirect to dashboard (full page load)."""
     if not user or user.get("role") != "client" or not engine:
-        return HTMLResponse(content="")
+        raise HTTPException(status_code=401, detail="Unauthorized")
     with engine.begin() as conn:
         conn.execute(
             text("UPDATE webwise.trucker_profiles SET is_first_login = false WHERE user_id = :uid"),
             {"uid": user.get("id")},
         )
-    return active_load(request, user)
+    response = HTMLResponse(content="")
+    response.headers["HX-Redirect"] = "/drivers/dashboard2"
+    return response
 
 
-@router.get("/clients/active-load", response_class=HTMLResponse)
+@router.get("/drivers/active-load", response_class=HTMLResponse)
 def active_load(request: Request, user: Optional[Dict] = Depends(current_user)):
     """
     Returns the driver's current active load (most recent WON negotiation).
@@ -462,13 +708,13 @@ def active_load(request: Request, user: Optional[Dict] = Depends(current_user)):
     
     if request.headers.get("HX-Request"):
         return templates.TemplateResponse(
-            "drivers/partials/active_load_card.html",
+            "drivers/partials/won_load_card.html",
             {"request": request, "load": active_load_data}
         )
     return active_load_data
 
 
-@router.get("/clients/my-contribution")
+@router.get("/drivers/my-contribution")
 def my_contribution(request: Request, user: Optional[Dict] = Depends(current_user)):
     """Per-driver Green Candle contribution. Returns HTML partial for HTMX, JSON otherwise."""
     if not user or user.get("role") != "client":
@@ -501,7 +747,7 @@ def my_contribution(request: Request, user: Optional[Dict] = Depends(current_use
     return stats
 
 
-@router.get("/clients/terminal/{load_id}", response_class=HTMLResponse)
+@router.get("/drivers/terminal/{load_id}", response_class=HTMLResponse)
 def negotiation_terminal(request: Request, load_id: str, user: Optional[Dict] = Depends(current_user)):
     """
     Negotiation Command Center: broker messages + AI suggestion + one-tap actions.
@@ -518,10 +764,10 @@ def negotiation_terminal(request: Request, load_id: str, user: Optional[Dict] = 
         )
         row = r.first()
         if not row:
-            return RedirectResponse(url="/clients/dashboard", status_code=303)
+            return RedirectResponse(url="/drivers/dashboard", status_code=303)
         display_name = (row.display_name or "").strip().lower()
         if not display_name:
-            return RedirectResponse(url="/clients/dashboard", status_code=303)
+            return RedirectResponse(url="/drivers/dashboard", status_code=303)
 
         messages = conn.execute(
             text("""
@@ -663,7 +909,7 @@ def negotiation_terminal(request: Request, load_id: str, user: Optional[Dict] = 
     )
 
 
-@router.post("/clients/negotiate/{load_id}/counter", response_class=HTMLResponse)
+@router.post("/drivers/negotiate/{load_id}/counter", response_class=HTMLResponse)
 def negotiate_counter(
     load_id: str,
     request: Request,
@@ -790,7 +1036,7 @@ def negotiate_counter(
     )
 
 
-@router.post("/clients/negotiate/{load_id}/counter-to-market", response_class=HTMLResponse)
+@router.post("/drivers/negotiate/{load_id}/counter-to-market", response_class=HTMLResponse)
 def negotiate_counter_to_market(
     load_id: str,
     request: Request,
@@ -921,7 +1167,7 @@ def negotiate_counter_to_market(
     )
 
 
-@router.post("/clients/negotiate/{load_id}/accept", response_class=HTMLResponse)
+@router.post("/drivers/negotiate/{load_id}/accept", response_class=HTMLResponse)
 def negotiate_accept(
     load_id: str,
     request: Request,
@@ -1007,7 +1253,79 @@ def negotiate_accept(
     )
 
 
-@router.post("/clients/negotiate/{load_id}/ignore", response_class=HTMLResponse)
+@router.post("/drivers/negotiate/{load_id}/abandon", response_class=HTMLResponse)
+def negotiate_abandon(
+    load_id: str,
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+):
+    """
+    Driver abandons this negotiation. Marks as 'lost' and returns refreshed Active Missions HTML.
+    """
+    if not user or user.get("role") != "client":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not engine:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            return _dashboard_active_loads_empty(request)
+        trucker_id = row[0]
+        conn.execute(
+            text("""
+                UPDATE webwise.negotiations
+                SET status = 'lost', updated_at = now()
+                WHERE load_id = :load_id AND trucker_id = :trucker_id
+            """),
+            {"load_id": load_id, "trucker_id": trucker_id},
+        )
+    return dashboard_active_loads(request, user)
+
+
+@router.post("/drivers/negotiate/{load_id}/force-call", response_class=HTMLResponse)
+def negotiate_force_call(
+    load_id: str,
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+):
+    """
+    Trigger Voice Escalation (0.5 $CANDLE). Deducts credits; in future will trigger AI phone call.
+    """
+    if not user or user.get("role") != "client":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not engine:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            raise HTTPException(status_code=403, detail="Trucker profile not found")
+        trucker_id = row[0]
+    balance = VestingService.get_claimable_balance(engine, trucker_id)
+    if balance < 0.5:
+        return HTMLResponse(
+            content="Insufficient $CANDLE (need 0.5 for Voice Escalation)",
+            status_code=402,
+        )
+    ok = record_usage(engine, trucker_id, load_id, "VOICE_ESCALATION")
+    if not ok:
+        return HTMLResponse(
+            content="Could not deduct 0.5 $CANDLE",
+            status_code=402,
+        )
+    return HTMLResponse(
+        content="",
+        status_code=204,
+        headers={"HX-Trigger": "negotiationUpdated, dashboardActiveLoadsRefresh"},
+    )
+
+
+@router.post("/drivers/negotiate/{load_id}/ignore", response_class=HTMLResponse)
 def negotiate_ignore(
     load_id: str,
     request: Request,
@@ -1030,10 +1348,10 @@ def negotiate_ignore(
         )
         row = r.first()
         if not row:
-            return RedirectResponse(url="/clients/dashboard", status_code=303)
+            return RedirectResponse(url="/drivers/dashboard", status_code=303)
         display_name = (row.display_name or "").strip().lower()
         if not display_name:
-            return RedirectResponse(url="/clients/dashboard", status_code=303)
+            return RedirectResponse(url="/drivers/dashboard", status_code=303)
 
         conn.execute(
             text("""
@@ -1051,10 +1369,10 @@ def negotiate_ignore(
             status_code=204,
             headers={"HX-Trigger": "negotiationUpdated"},
         )
-    return RedirectResponse(url="/clients/dashboard", status_code=303)
+    return RedirectResponse(url="/drivers/dashboard", status_code=303)
 
 
-@router.post("/clients/load/{load_id}/toggle-autopilot", response_class=HTMLResponse)
+@router.post("/drivers/load/{load_id}/toggle-autopilot", response_class=HTMLResponse)
 def toggle_autopilot(
     load_id: str,
     request: Request,
@@ -1143,7 +1461,7 @@ def toggle_autopilot(
     )
 
 
-@router.get("/clients/inbox")
+@router.get("/drivers/inbox")
 def driver_inbox(
     request: Request,
     user: Optional[Dict] = Depends(current_user),
@@ -1207,7 +1525,7 @@ def driver_inbox(
     return {"messages": messages}
 
 
-@router.get("/clients/notifications/poll", response_class=HTMLResponse)
+@router.get("/drivers/notifications/poll", response_class=HTMLResponse)
 def poll_notifications(request: Request, user: Optional[Dict] = Depends(current_user)):
     """
     HTMX polling endpoint: checks every 30s for new unread notifications.
@@ -1284,7 +1602,7 @@ def poll_notifications(request: Request, user: Optional[Dict] = Depends(current_
     return resp
 
 
-@router.post("/clients/notifications/{notification_id}/read", response_class=HTMLResponse)
+@router.post("/drivers/notifications/{notification_id}/read", response_class=HTMLResponse)
 def mark_notification_read(notification_id: int, user: Optional[Dict] = Depends(current_user)):
     """Mark read and return empty so HTMX removes the toast (outerHTML swap)."""
     if not user or user.get("role") != "client" or not engine:
@@ -1305,7 +1623,7 @@ def mark_notification_read(notification_id: int, user: Optional[Dict] = Depends(
     return HTMLResponse(content="")
 
 
-@router.post("/clients/negotiations/{negotiation_id}/confirm", response_class=HTMLResponse)
+@router.post("/drivers/negotiations/{negotiation_id}/confirm", response_class=HTMLResponse)
 async def confirm_negotiation(negotiation_id: int, request: Request, user: Optional[Dict] = Depends(current_user), db: Session = Depends(get_db)):
     """
     Driver confirms a PENDING_APPROVAL negotiation → marks as WON.
@@ -1474,7 +1792,7 @@ async def confirm_negotiation(negotiation_id: int, request: Request, user: Optio
     return {"status": "confirmed", "negotiation_id": negotiation_id}
 
 
-@router.post("/clients/negotiations/{negotiation_id}/reject", response_class=HTMLResponse)
+@router.post("/drivers/negotiations/{negotiation_id}/reject", response_class=HTMLResponse)
 async def reject_negotiation(negotiation_id: int, request: Request, user: Optional[Dict] = Depends(current_user), db: Session = Depends(get_db)):
     """
     Driver rejects a PENDING_APPROVAL negotiation → marks as LOST.
@@ -1780,6 +2098,7 @@ def get_driver_savings(mc_number: str, db: Session = Depends(get_db)):
     }    
 
 @router.get("/savings-view", response_class=HTMLResponse)
+@router.get("/drivers/savings", response_class=HTMLResponse)
 def view_savings_page(request: Request, user: Optional[Dict] = Depends(current_user)):
     """
     Display the driver's savings dashboard page.
@@ -2027,7 +2346,7 @@ def view_savings_page(request: Request, user: Optional[Dict] = Depends(current_u
     )
 
 
-@router.get("/clients/claim/modal", response_class=HTMLResponse)
+@router.get("/drivers/claim/modal", response_class=HTMLResponse)
 def claim_modal(request: Request, user: Optional[Dict] = Depends(current_user)):
     """HTMX endpoint: Returns the claim tokens modal."""
     if not user or user.get("role") != "client" or not engine:
@@ -2065,7 +2384,7 @@ def claim_modal(request: Request, user: Optional[Dict] = Depends(current_user)):
     )
 
 
-@router.get("/clients/wallet/setup-modal", response_class=HTMLResponse)
+@router.get("/drivers/wallet/setup-modal", response_class=HTMLResponse)
 def wallet_setup_modal(request: Request, user: Optional[Dict] = Depends(current_user)):
     """HTMX endpoint: Returns the wallet setup modal."""
     if not user or user.get("role") != "client":
@@ -2077,7 +2396,7 @@ def wallet_setup_modal(request: Request, user: Optional[Dict] = Depends(current_
     )
 
 
-@router.post("/clients/wallet/setup", response_class=HTMLResponse)
+@router.post("/drivers/wallet/setup", response_class=HTMLResponse)
 async def setup_wallet(request: Request, user: Optional[Dict] = Depends(current_user)):
     """Save wallet address to trucker profile."""
     if not user or user.get("role") != "client" or not engine:
@@ -2124,7 +2443,7 @@ async def setup_wallet(request: Request, user: Optional[Dict] = Depends(current_
     return RedirectResponse(url="/savings-view", status_code=303)
 
 
-@router.post("/clients/claim/request", response_class=HTMLResponse)
+@router.post("/drivers/claim/request", response_class=HTMLResponse)
 async def submit_claim_request(request: Request, user: Optional[Dict] = Depends(current_user)):
     """Submit a claim request for vested tokens."""
     if not user or user.get("role") != "client" or not engine:
@@ -2204,7 +2523,7 @@ async def submit_claim_request(request: Request, user: Optional[Dict] = Depends(
     return RedirectResponse(url="/savings-view", status_code=303)
 
 
-@router.post("/clients/claim/reinvest", response_class=HTMLResponse)
+@router.post("/drivers/claim/reinvest", response_class=HTMLResponse)
 async def reinvest_tokens(request: Request, user: Optional[Dict] = Depends(current_user)):
     """Re-invest claimable tokens for +5% bonus (extends vesting by 3 months)."""
     if not user or user.get("role") != "client" or not engine:
@@ -2275,7 +2594,7 @@ async def reinvest_tokens(request: Request, user: Optional[Dict] = Depends(curre
     return RedirectResponse(url="/savings-view", status_code=303)
 
 
-@router.get("/clients/leaderboard", response_class=HTMLResponse)
+@router.get("/drivers/leaderboard", response_class=HTMLResponse)
 def get_fuel_leaderboard(request: Request, user: Optional[Dict] = Depends(current_user)):
     """HTMX endpoint: Returns the fuel leaderboard partial."""
     if not user or user.get("role") != "client" or not engine:
@@ -2293,7 +2612,7 @@ def get_fuel_leaderboard(request: Request, user: Optional[Dict] = Depends(curren
     )
 
 
-@router.post("/clients/debit-card/request", response_class=HTMLResponse)
+@router.post("/drivers/debit-card/request", response_class=HTMLResponse)
 async def request_debit_card(request: Request, user: Optional[Dict] = Depends(current_user)):
     """Request a GC Fuel & Fleet Card (Month 5 feature)."""
     if not user or user.get("role") != "client" or not engine:
@@ -2383,7 +2702,7 @@ async def request_debit_card(request: Request, user: Optional[Dict] = Depends(cu
     return RedirectResponse(url="/savings-view", status_code=303)
 
 
-@router.post("/clients/cards/activate", response_class=HTMLResponse)
+@router.post("/drivers/cards/activate", response_class=HTMLResponse)
 async def activate_card(request: Request, user: Optional[Dict] = Depends(current_user)):
     """Activate a shipped card (driver confirms receipt)."""
     if not user or user.get("role") != "client" or not engine:
@@ -2463,7 +2782,7 @@ async def activate_card(request: Request, user: Optional[Dict] = Depends(current
     return RedirectResponse(url="/savings-view", status_code=303)
 
 
-@router.get("/clients/cards/transfer-modal", response_class=HTMLResponse)
+@router.get("/drivers/cards/transfer-modal", response_class=HTMLResponse)
 def transfer_modal(request: Request, user: Optional[Dict] = Depends(current_user)):
     """HTMX endpoint: Returns the transfer tokens to card modal."""
     if not user or user.get("role") != "client" or not engine:
@@ -2509,7 +2828,7 @@ def transfer_modal(request: Request, user: Optional[Dict] = Depends(current_user
     )
 
 
-@router.post("/clients/cards/transfer", response_class=HTMLResponse)
+@router.post("/drivers/cards/transfer", response_class=HTMLResponse)
 async def transfer_to_card(request: Request, user: Optional[Dict] = Depends(current_user)):
     """Transfer tokens from vault to debit card."""
     if not user or user.get("role") != "client" or not engine:
@@ -2575,7 +2894,7 @@ async def transfer_to_card(request: Request, user: Optional[Dict] = Depends(curr
     return RedirectResponse(url="/savings-view", status_code=303)
 
 
-@router.get("/clients/scout-config", response_class=HTMLResponse)
+@router.get("/drivers/scout-config", response_class=HTMLResponse)
 def scout_config(request: Request, user: Optional[Dict] = Depends(current_user)):
     """Scout Extension configuration page - shows API key and setup instructions."""
     if not user or user.get("role") != "client":
@@ -2630,7 +2949,7 @@ def scout_config(request: Request, user: Optional[Dict] = Depends(current_user))
     )
 
 
-@router.post("/clients/scout/generate-api-key", response_class=HTMLResponse)
+@router.post("/drivers/scout/generate-api-key", response_class=HTMLResponse)
 async def generate_api_key(request: Request, user: Optional[Dict] = Depends(current_user)):
     """Generate or regenerate API key for Scout Extension."""
     if not user or user.get("role") != "client" or not engine:
@@ -2711,7 +3030,7 @@ async def generate_api_key(request: Request, user: Optional[Dict] = Depends(curr
     return RedirectResponse(url="/savings-view", status_code=303)
 
 
-@router.get("/clients/referrals", response_class=HTMLResponse)
+@router.get("/drivers/referrals", response_class=HTMLResponse)
 def referrals_page(request: Request, user: Optional[Dict] = Depends(current_user)):
     """
     Fleet Builder page - Shows referral rewards in $CANDLE tokens.

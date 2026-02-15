@@ -34,7 +34,7 @@
 <body class="bg-slate-950 text-white font-sans antialiased min-h-screen pb-20">
 
     <!-- HTMX Notification Polling (Invisible Watcher) -->
-    <div hx-get="/clients/notifications/poll" 
+    <div hx-get="/drivers/notifications/poll" 
          hx-trigger="every 30s" 
          hx-target="#notification-container" 
          hx-swap="beforeend"
@@ -58,7 +58,7 @@
     </div>
 
     <!-- Welcome Fuel Banner (first login only) -->
-    <div class="px-4" hx-get="/clients/welcome-fuel-banner" hx-trigger="load" hx-swap="innerHTML">
+    <div class="px-4" hx-get="/drivers/welcome-fuel-banner" hx-trigger="load" hx-swap="innerHTML">
         <!-- HTMX loads banner when is_first_login and balance > 0 -->
     </div>
 
@@ -71,7 +71,7 @@
             </div>
         </div>
         <div id="dashboard-mission-slot"
-             hx-get="/clients/dashboard-mission" 
+             hx-get="/drivers/dashboard-mission" 
              hx-trigger="load, every 15s, negotiationUpdated from:body, onboardingStepComplete from:body" 
              hx-swap="innerHTML"
              hx-indicator="#active-load-loading">
@@ -85,7 +85,7 @@
     <!-- My Green Candle Impact Widget (HTMX Lazy-Loading) -->
     <div class="px-4 mb-6">
         <div class="bg-gray-800 rounded-2xl p-6 border border-green-500/20 shadow-xl">
-            <div hx-get="/clients/my-contribution" 
+            <div hx-get="/drivers/my-contribution" 
                  hx-trigger="load, contributionUpdated from:body" 
                  hx-swap="innerHTML"
                  hx-indicator="#contribution-loading">
@@ -269,7 +269,7 @@
             console.log('🕯️ Contribution updated! Refreshing stats...');
             // HTMX will automatically refresh the widget due to hx-trigger="contributionUpdated from:body"
             // Add visual feedback
-            const widget = document.querySelector('[hx-get="/clients/my-contribution"]');
+            const widget = document.querySelector('[hx-get="/drivers/my-contribution"]');
             if (widget) {
                 widget.classList.add('ring-2', 'ring-green-500', 'ring-opacity-50');
                 setTimeout(() => {
@@ -280,7 +280,7 @@
     </script>
 
     <!-- Fuel Leaderboard (Lazy-loaded) -->
-    <div hx-get="/clients/leaderboard" 
+    <div hx-get="/drivers/leaderboard" 
          hx-trigger="load" 
          hx-swap="innerHTML"
          class="mt-8">

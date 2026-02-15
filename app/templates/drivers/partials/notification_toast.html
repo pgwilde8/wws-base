@@ -19,14 +19,14 @@
     <p class="text-white text-sm font-bold">{{ notification.message }}</p>
     {% if notification.notif_type == 'PENDING_APPROVAL' and notification.negotiation_id %}
     <div class="flex gap-2 mt-3">
-      <button hx-post="/clients/negotiations/{{ notification.negotiation_id }}/confirm"
+      <button hx-post="/drivers/negotiations/{{ notification.negotiation_id }}/confirm"
               hx-target="closest .notification-toast"
               hx-swap="outerHTML"
               hx-trigger="click"
               class="flex-1 bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs py-2 px-4 rounded-lg transition">
         ✅ CONFIRM
       </button>
-      <button hx-post="/clients/negotiations/{{ notification.negotiation_id }}/reject"
+      <button hx-post="/drivers/negotiations/{{ notification.negotiation_id }}/reject"
               hx-target="closest .notification-toast"
               hx-swap="outerHTML"
               hx-trigger="click"
@@ -35,7 +35,7 @@
       </button>
     </div>
     {% else %}
-    <button hx-post="/clients/notifications/{{ notification.id }}/read"
+    <button hx-post="/drivers/notifications/{{ notification.id }}/read"
             hx-target="closest .notification-toast"
             hx-swap="outerHTML"
             class="mt-2 text-xs text-green-400 font-black uppercase hover:underline">

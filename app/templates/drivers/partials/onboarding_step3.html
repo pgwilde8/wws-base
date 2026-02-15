@@ -1,18 +1,41 @@
-<div class="bg-gradient-to-br from-green-900/40 to-slate-900 rounded-2xl border-2 border-green-500/50 p-6" id="onboarding-container">
-    <div class="flex items-center justify-center gap-2 mb-4">
+<div class="bg-gradient-to-br from-slate-900 to-black rounded-3xl border-2 border-green-500/30 p-8 shadow-2xl animate-bounce-in" id="onboarding-container">
+    <div class="flex items-center justify-center gap-3 mb-6">
         <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">✓</span>
         <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">✓</span>
-        <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">✓</span>
+        <span class="bg-blue-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center ring-4 ring-blue-500/20">3</span>
     </div>
-    <h2 class="text-green-400 font-bold mb-2 text-center">Step 3: Fuel Up</h2>
-    <p class="text-white text-2xl font-black text-center mb-1">{{ "%.1f"|format(balance) }} $CANDLE</p>
-    <p class="text-[10px] text-slate-400 text-center mb-4">Your starter fuel is ready. You're set to dispatch.</p>
-        <div class="flex justify-center">
-        <button hx-post="/clients/onboarding/complete"
-                hx-target="#onboarding-container"
-                hx-swap="outerHTML"
-                class="bg-green-600 hover:bg-green-500 text-white text-xs font-bold py-2 px-8 rounded-full transition active:scale-95">
-            Continue to Dashboard
+
+    <h2 class="text-white text-xl font-bold mb-1 text-center">Systems Activated</h2>
+    <div class="py-6 my-4 bg-black/50 rounded-2xl border border-slate-800 text-center">
+        <p class="text-[10px] text-blue-400 uppercase font-black tracking-widest mb-1">Automation Fuel Loaded</p>
+        <p class="text-5xl font-black text-white neon-text mb-1">{{ "%.1f"|format(balance) }}</p>
+        <p class="text-xs text-blue-500 font-bold">$CANDLE</p>
+    </div>
+
+    <div class="space-y-3 mb-8">
+        <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider ml-1">Service Usage Menu</p>
+        <div class="grid grid-cols-3 gap-2">
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                <div class="text-[10px] text-slate-500 mb-1">Email</div>
+                <div class="text-sm font-bold text-white">0.1</div>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                <div class="text-[10px] text-slate-500 mb-1">Voice</div>
+                <div class="text-sm font-bold text-blue-400">0.5</div>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                <div class="text-[10px] text-slate-500 mb-1">Booked</div>
+                <div class="text-sm font-bold text-green-400">3.0</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex justify-center">
+        <button hx-post="/drivers/onboarding/complete"
+                hx-target="body"
+                class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-blue-500/20 active:scale-95 flex items-center justify-center gap-2">
+            <span>START MISSION</span>
+            <i class="fas fa-arrow-right text-xs"></i>
         </button>
     </div>
 </div>

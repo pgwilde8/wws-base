@@ -14,7 +14,7 @@
                    placeholder="yourname"
                    id="onboarding-handle-input"
                    class="w-full bg-black border-2 border-slate-600 p-3 rounded-lg text-center font-bold text-white pr-28 focus:outline-none focus:ring-2 focus:ring-green-500"
-                   hx-get="/clients/onboarding/check-handle"
+                   hx-get="/drivers/onboarding/check-handle"
                    hx-trigger="keyup changed delay:500ms"
                    hx-target="#handle-status"
                    hx-include="#handle-form">
@@ -28,7 +28,7 @@
         <div class="flex justify-center mt-4">
             <button type="submit"
                     form="handle-form"
-                    hx-post="/clients/onboarding/claim-handle"
+                    hx-post="/drivers/onboarding/claim-handle"
                     hx-include="#handle-form"
                     hx-target="#onboarding-container"
                     hx-swap="outerHTML"

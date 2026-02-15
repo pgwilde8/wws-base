@@ -21,7 +21,7 @@ if not os.getenv("DATABASE_URL"):
                 os.environ["DATABASE_URL"] = line.split("=", 1)[1].strip().strip('"').strip("'")
                 break
 
-from app.routes import public_router, auth_router, admin_router, client_router, legal_router, ingest_router
+from app.routes import public_router, auth_router, admin_router, client_router, legal_router, ingest_router, api_router
 
 app = FastAPI(title="Green Candle Dispatch")
 
@@ -33,7 +33,8 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(client_router)
 app.include_router(legal_router)
-app.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"])  # Chrome Extension ingestion endpoint
+app.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"])
+app.include_router(api_router)  # Scout heartbeat, etc.
 
 PORT = int(os.getenv("PORT", "8990"))
 

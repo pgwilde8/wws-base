@@ -1,29 +1,66 @@
-<div class="bg-gradient-to-br from-green-900/40 to-slate-900 rounded-xl border-l-4 border-green-500 p-4 shadow-xl">
-    <div class="flex justify-between items-start mb-3">
-        <div>
-            <div class="text-green-400 text-xs font-bold uppercase">Load #{{ load.load_id }}</div>
-            <div class="text-white text-sm">{{ load.origin }} → {{ load.destination }}</div>
+{% for load in loads %}
+<div class="bg-slate-900 rounded-2xl border {% if load.status == 'replied' or load.status_badge == '📩 RATE CON RECEIVED' %}border-green-500/50{% else %}border-blue-500/50{% endif %} p-5 mb-4 shadow-xl">
+    {# Header: Origin → Destination | Status Badge #}
+    <div class="flex justify-between items-start mb-4">
+        <div class="font-bold text-white text-sm">
+            {{ load.origin }} ⮕ {{ load.destination }}
         </div>
-        <div class="flex flex-col items-end gap-1">
-            <div class="flex items-center gap-2">
-                {% if load.unread_count and load.unread_count > 0 %}
-                <span class="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse font-bold">
-                    {{ load.unread_count }} NEW REPLY{% if load.unread_count > 1 %}S{% endif %}
-                </span>
-                {% endif %}
-                <span class="text-white font-mono text-sm">${{ "{:,.2f}".format(load.final_rate) }}</span>
-            </div>
-            {% if load.estimated_credits_candle and load.estimated_credits_candle > 0 %}
-            <div class="text-[10px] text-green-400/90">
-                <i class="fas fa-coins mr-0.5"></i>
-                ~{{ "%.1f"|format(load.estimated_credits_candle) }} $CANDLE to earn
-            </div>
-            {% endif %}
-        </div>
+        <span class="bg-slate-800 text-[9px] px-2 py-1 rounded-full font-black text-slate-300 uppercase">
+            {{ load.status_badge }}
+        </span>
     </div>
-    <a href="/clients/terminal/{{ load.load_id }}" 
-       class="block w-full mt-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold py-2 rounded-lg text-center transition flex items-center justify-center gap-2">
-        <i class="fas fa-terminal"></i>
-        Open Negotiation Terminal
-    </a>
+
+    {# Assigned Truck #}
+    {% if load.assigned_truck %}
+    <div class="text-[10px] text-slate-500 mb-3">Assigned: Truck #{{ load.assigned_truck }}</div>
+    {% endif %}
+
+    {# Money Row: Broker | AI Target | Gain (glowing highlight on ROI) #}
+    <div class="flex flex-wrap items-center gap-3 mb-4 p-3 bg-black/40 rounded-xl border border-slate-800">
+        <span class="text-slate-400 text-xs">Broker:</span>
+        <span class="text-slate-300 font-mono font-bold">${{ "{:,.0f}".format(load.broker_offer) if load.broker_offer else "—" }}</span>
+        <span class="text-slate-600">|</span>
+        <span class="text-slate-400 text-xs">AI Target:</span>
+        <span class="text-blue-400 font-mono font-bold">${{ "{:,.0f}".format(load.target_rate) if load.target_rate else "—" }}</span>
+        <span class="text-slate-600">|</span>
+        {% if load.profit_gap and load.profit_gap > 0 %}
+        <span class="text-slate-400 text-xs">Gain:</span>
+        <span class="gain-glow font-mono font-bold text-green-400">+${{ "{:,.0f}".format(load.profit_gap) }}</span>
+        {% endif %}
+    </div>
+
+    {# Live Intelligence Feed (Mini-Timeline) #}
+    <div class="space-y-2 mb-4">
+        <div class="text-[9px] text-slate-500 uppercase font-bold mb-2">Live Feed</div>
+        {% for event in load.timeline %}
+        <div class="flex gap-3 text-xs">
+            <span class="text-slate-500 font-mono shrink-0">{{ event.time }}</span>
+            <span class="text-slate-300">{{ event.text }}{% if event.cost %} (Cost: {{ event.cost }} $CANDLE){% endif %}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    {# Action Buttons #}
+    <div class="flex flex-wrap gap-2 pt-3 border-t border-slate-800">
+        <a href="/drivers/terminal/{{ load.load_id }}"
+           class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-4 py-2 rounded-lg transition">
+            <i class="fas fa-terminal"></i> Intervene
+        </a>
+        <button type="button"
+                hx-post="/drivers/negotiate/{{ load.load_id }}/force-call"
+                hx-swap="none"
+                hx-trigger="click"
+                class="inline-flex items-center gap-1.5 bg-amber-600/80 hover:bg-amber-500 text-white text-[10px] font-bold px-4 py-2 rounded-lg transition">
+            <i class="fas fa-phone"></i> Force Call <span class="text-amber-200">(0.5 $CANDLE)</span>
+        </button>
+        <button type="button"
+                hx-post="/drivers/negotiate/{{ load.load_id }}/abandon"
+                hx-target="#active-missions-container"
+                hx-swap="innerHTML"
+                hx-confirm="Stop this negotiation?"
+                class="inline-flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-[10px] font-bold px-4 py-2 rounded-lg transition">
+            <i class="fas fa-stop"></i> Abandon
+        </button>
+    </div>
 </div>
+{% endfor %}

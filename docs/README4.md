@@ -47,7 +47,7 @@ app/
 │   ├── add_factoring_columns.py  # Add factoring_company, referral_status to webwise.users
 │   └── add_referrals.py          # Referral codes / referred_by (if used)
 ├── static/                 # Static files (e.g. audio for notifications)
-└── templates/              # Jinja2: layout, public, admin, auth, clients, legal, partials
+└── templates/              # Jinja2: layout, public, admin, auth, drivers, legal, partials
 ```
 
 ---
@@ -66,9 +66,9 @@ app/
 | | `/logout` | Clear session, redirect. |
 | | `/register-trucker`, `/auth/register-trucker` (GET/POST) | Trucker signup (user + trucker_profile, factoring/referral fields). |
 | | `/register` (GET/POST) | Generic register (ref_code; POST may be stub). |
-| **Client** | `/clients/dashboard` | Client dashboard (auth required). |
-| | `/clients/my-contribution` | HTMX partial: win count + $CANDLE contribution. |
-| | `/clients/notifications/poll`, `/clients/notifications/{id}/read` | Notifications poll + mark read. |
+| **Driver** | `/drivers/dashboard` | Driver dashboard (auth required). |
+| | `/drivers/my-contribution` | HTMX partial: win count + $CANDLE contribution. |
+| | `/drivers/notifications/poll`, `/drivers/notifications/{id}/read` | Notifications poll + mark read. |
 | | `/negotiate/{load_id}` (POST) | AI draft for negotiation. |
 | | `/loads/upload-bol` (POST) | BOL upload → Spaces, 2% fee, factoring bridge, credit driver savings. |
 | | `/savings/dashboard/{mc_number}` | JSON: driver savings (locked/unlocked, next vest, history). |

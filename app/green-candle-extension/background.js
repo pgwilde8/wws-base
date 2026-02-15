@@ -16,6 +16,27 @@ async function getApiKey() {
     });
 }
 
+const BASE_URL = "http://134.199.241.56:8990";
+
+// Send Scout heartbeat so dashboard shows "Scout Active"
+async function sendHeartbeat(apiKey, lanes = ["NJ-FL"], minRpm = 2.45, active = true) {
+    try {
+        const response = await fetch(`${BASE_URL}/api/scout/heartbeat`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-API-Key": apiKey
+            },
+            body: JSON.stringify({ lanes, min_rpm: minRpm, active })
+        });
+        if (response.ok) {
+            console.log("📡 Scout heartbeat sent");
+        }
+    } catch (e) {
+        console.warn("Scout heartbeat failed:", e);
+    }
+}
+
 // Check connection status
 async function checkConnection() {
     const apiKey = await getApiKey();
@@ -24,8 +45,7 @@ async function checkConnection() {
     }
     
     try {
-        // Use production server URL (can be overridden via environment)
-        const API_URL = "http://134.199.241.56:8990/api/ingest/loads";
+        const API_URL = `${BASE_URL}/api/ingest/loads`;
         const response = await fetch(API_URL, {
             method: "POST",
             headers: {
@@ -39,6 +59,8 @@ async function checkConnection() {
             return { connected: false, message: "Invalid API key" };
         }
         
+        // Connection OK: send heartbeat so dashboard shows "Scout Active"
+        await sendHeartbeat(apiKey);
         return { connected: true, message: "Connected" };
     } catch (error) {
         return { connected: false, message: "Connection failed" };
@@ -77,9 +99,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 
                 console.log("🚀 Sending data to HQ...", request.loads);
 
-                // Use production server URL
-                const API_URL = "http://134.199.241.56:8990/api/ingest/loads";
-
+                const API_URL = `${BASE_URL}/api/ingest/loads`;
                 console.log("📡 API Key present:", apiKey ? "Yes" : "No");
                 console.log("📡 Sending to:", API_URL);
 
@@ -106,8 +126,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const data = await response.json();
                 console.log("✅ HQ Response:", data);
                 
-                // Update icon on successful connection
                 await updateIcon();
+                await sendHeartbeat(apiKey);  // Dashboard shows Scout Active
                 
                 sendResponse({ success: true, data: data });
             } catch (error) {

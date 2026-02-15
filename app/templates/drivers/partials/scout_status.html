@@ -1,0 +1,16 @@
+<div class="flex items-center justify-between mb-6">
+    <span class="text-xs font-bold text-white">Scout Status</span>
+    <span class="{% if scout.active %}bg-green-500/10 text-green-500{% else %}bg-slate-600/20 text-slate-500{% endif %} text-[9px] px-2 py-1 rounded-full font-black uppercase">
+        {{ 'ACTIVE' if scout.active else 'IDLE' }}
+    </span>
+</div>
+<div class="space-y-4">
+    <div class="bg-black/40 p-3 rounded-xl border border-slate-800">
+        <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Watching Lanes</div>
+        <div class="text-sm font-bold text-white">{{ scout.lanes_display or '—' }}</div>
+    </div>
+    <div class="bg-black/40 p-3 rounded-xl border border-slate-800">
+        <div class="text-[9px] text-slate-500 uppercase font-bold mb-1">Target RPM</div>
+        <div class="text-sm font-bold text-blue-400">${{ "%.2f"|format(scout.min_rpm) }} / mi</div>
+    </div>
+</div>

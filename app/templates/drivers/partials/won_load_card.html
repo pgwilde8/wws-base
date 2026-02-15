@@ -1,0 +1,29 @@
+<div class="bg-gradient-to-br from-green-900/40 to-slate-900 rounded-xl border-l-4 border-green-500 p-4 shadow-xl">
+    <div class="flex justify-between items-start mb-3">
+        <div>
+            <div class="text-green-400 text-xs font-bold uppercase">Load #{{ load.load_id }}</div>
+            <div class="text-white text-sm">{{ load.origin }} → {{ load.destination }}</div>
+        </div>
+        <div class="flex flex-col items-end gap-1">
+            <div class="flex items-center gap-2">
+                {% if load.unread_count and load.unread_count > 0 %}
+                <span class="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse font-bold">
+                    {{ load.unread_count }} NEW REPLY{% if load.unread_count > 1 %}S{% endif %}
+                </span>
+                {% endif %}
+                <span class="text-white font-mono text-sm">${{ "{:,.2f}".format(load.final_rate) }}</span>
+            </div>
+            {% if load.estimated_credits_candle and load.estimated_credits_candle > 0 %}
+            <div class="text-[10px] text-green-400/90">
+                <i class="fas fa-coins mr-0.5"></i>
+                ~{{ "%.1f"|format(load.estimated_credits_candle) }} $CANDLE to earn
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <a href="/drivers/terminal/{{ load.load_id }}" 
+       class="block w-full mt-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold py-2 rounded-lg text-center transition flex items-center justify-center gap-2">
+        <i class="fas fa-terminal"></i>
+        Open Negotiation Terminal
+    </a>
+</div>

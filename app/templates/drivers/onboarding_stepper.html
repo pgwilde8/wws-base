@@ -1,0 +1,30 @@
+<div class="max-w-2xl mx-auto py-12 px-4">
+    <div class="flex justify-between mb-8 px-2">
+        <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">1</div>
+            <span class="text-[10px] uppercase text-blue-500 font-bold mt-2">Identity</span>
+        </div>
+        <div class="flex-1 h-[2px] bg-slate-800 mt-4 mx-2"></div>
+        <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center font-bold text-xs">2</div>
+            <span class="text-[10px] uppercase text-slate-600 font-bold mt-2">Authority</span>
+        </div>
+        <div class="flex-1 h-[2px] bg-slate-800 mt-4 mx-2"></div>
+        <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full bg-slate-800 text-slate-500 flex items-center justify-center font-bold text-xs">3</div>
+            <span class="text-[10px] uppercase text-slate-600 font-bold mt-2">Activation</span>
+        </div>
+    </div>
+
+    <div id="stepper-content" class="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+        <h2 class="text-2xl font-bold text-white mb-2">Welcome to the Fleet</h2>
+        <p class="text-slate-400 text-sm mb-8">Before you can deploy your AI Scout, we need to set up your professional dispatch infrastructure.</p>
+        
+        <div hx-get="/drivers/onboarding/step-1" hx-trigger="load">
+            <div class="animate-pulse flex space-y-4 flex-col">
+                <div class="h-12 bg-slate-800 rounded w-full"></div>
+                <div class="h-4 bg-slate-800 rounded w-3/4"></div>
+            </div>
+        </div>
+    </div>
+</div>
