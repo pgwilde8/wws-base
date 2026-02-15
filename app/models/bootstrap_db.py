@@ -221,6 +221,12 @@ def run_bootstrap():
                     ALTER TABLE webwise.loads ADD COLUMN discovered_by_id INTEGER REFERENCES webwise.trucker_profiles(id);
                     CREATE INDEX IF NOT EXISTS idx_loads_discovered_by ON webwise.loads(discovered_by_id);
                 END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_schema = 'webwise' 
+                               AND table_name = 'loads' 
+                               AND column_name = 'miles') THEN
+                    ALTER TABLE webwise.loads ADD COLUMN miles INTEGER;
+                END IF;
             END $$;
         """))
         conn.execute(text("""
@@ -398,6 +404,24 @@ def run_bootstrap():
         """))
         conn.execute(text("""
             CREATE INDEX IF NOT EXISTS idx_broker_emails_email ON webwise.broker_emails(email);
+        """))
+        # Auto-Pilot: per-driver per-load guardrails
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS webwise.autopilot_settings (
+                id SERIAL PRIMARY KEY,
+                trucker_id INTEGER NOT NULL REFERENCES webwise.trucker_profiles(id) ON DELETE CASCADE,
+                load_id VARCHAR(64) NOT NULL,
+                floor_price FLOAT NOT NULL,
+                target_price FLOAT NOT NULL,
+                is_autopilot BOOLEAN NOT NULL DEFAULT false,
+                created_at TIMESTAMP DEFAULT now(),
+                updated_at TIMESTAMP,
+                UNIQUE (trucker_id, load_id)
+            );
+        """))
+        conn.execute(text("""
+            CREATE INDEX IF NOT EXISTS idx_autopilot_settings_lookup
+            ON webwise.autopilot_settings(trucker_id, load_id) WHERE is_autopilot = true;
         """))
         existing = conn.execute(text("SELECT COUNT(*) FROM webwise.projects;")).scalar()
         if existing == 0:

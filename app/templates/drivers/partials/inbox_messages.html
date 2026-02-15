@@ -1,0 +1,29 @@
+{% if messages %}
+<div class="space-y-3">
+  {% for m in messages %}
+  <div class="bg-slate-800/60 border border-slate-700 rounded-lg p-4 {{ 'opacity-75' if m.is_read else '' }}">
+    <div class="flex justify-between items-start gap-2">
+      <div class="min-w-0">
+        <div class="text-xs text-slate-400 truncate">{{ m.sender_email }}</div>
+        <div class="text-sm font-semibold text-white mt-0.5">{{ m.subject or '(no subject)' }}</div>
+        <div class="text-xs text-slate-500 mt-1">
+          Load <span class="font-mono text-emerald-400">{{ m.load_id }}</span>
+          {% if m.received_at %} &middot; {{ m.received_at[:19].replace('T', ' ') }}{% endif %}
+        </div>
+      </div>
+      {% if not m.is_read %}
+      <span class="shrink-0 bg-emerald-500/30 text-emerald-300 text-[10px] px-2 py-0.5 rounded">NEW</span>
+      {% endif %}
+    </div>
+    {% if m.body_text %}
+    <p class="text-sm text-slate-300 mt-2 line-clamp-3">{{ m.body_text }}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-8 text-slate-500 text-sm">
+  <p>No broker replies yet.</p>
+  <p class="text-xs mt-1">Replies to your load emails will appear here.</p>
+</div>
+{% endif %}

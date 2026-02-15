@@ -80,7 +80,8 @@ WHERE mc_number = '322572';
 
 ```sql
 \x on
-SELECT * FROM webwise.brokers WHERE mc_number = '322572';
+SELECT * FROM webwise.brokers WHERE mc_number = '143059';
+SELECT * FROM webwise.brokers WHERE mc_number = '143059';
 \x off
 ```
 

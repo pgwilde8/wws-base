@@ -17,7 +17,7 @@ tree /srv/projects/client/dispatch/app/api/v1/__pycache__
 # git remote set-url origin https://YOUR_TOKEN@github.com/pgwilde8/dispatch.git
 
 git add -A
-git commit -m "enhances2"
+git commit -m "bdb3"
 git push -u origin main
 
 http://134.199.241.56:8990/admin/login
@@ -29,6 +29,9 @@ Enter:
 Email: driver@test.com
 Password: test123
 
+email:
+dispatch@gcdloads.com
+1@NqEfg#^gaVsX1&
 
 Your Key: 41713b4c27074cdf51f08ba1906e860f9205ec66f14f0ac90b115decf2233c3c
 
@@ -49,7 +52,8 @@ FROM webwise.brokers;
 python3 scripts/add_broker_contact.py --mc 315784 --email imills@onlinefreight.com    
 
 connect: psql "postgresql://wws-admin:WwsAdmin2026%21@localhost/wws_dispatch_db"
-
+python3 final_check.py
+python3 inbound_listener.py
 
 
 nematches@ntgfreight.com

@@ -1,37 +1,35 @@
 """
-Vesting Service - Calculates claimable balances and manages vesting logic.
+Vesting Service - Available service balance (Automation Fuel).
+Legacy name retained for compatibility; logic is "Available Fuel" (no vesting).
 """
 from typing import Optional, Dict, Any
-from datetime import datetime
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
 
 class VestingService:
-    """Handles vesting period calculations and claimable balance logic."""
+    """Available service balance—credits ready for Auto-Pilot, Counter, Voice."""
     
     @staticmethod
     def get_claimable_balance(engine: Optional[Engine], trucker_id: int) -> float:
         """
-        Calculate the total amount of $CANDLE that is ready to claim.
-        
-        Criteria:
-        - Status is 'VESTED' (unlock date has passed)
-        - OR status is 'LOCKED' but unlocks_at <= now()
-        
-        Args:
-            engine: Database engine
-            trucker_id: The trucker profile ID
-        
-        Returns:
-            Total claimable balance in $CANDLE tokens
+        Available Automation Fuel: sum of all usable credits.
+        CREDITED (immediate rebate) + VESTED + LOCKED where unlock date passed.
+        Excludes: CLAIMED, CONSUMED.
+        """
+        return VestingService.get_available_service_balance(engine, trucker_id)
+
+    @staticmethod
+    def get_available_service_balance(engine: Optional[Engine], trucker_id: int) -> float:
+        """
+        Total credits available for platform automation (Auto-Pilot, etc.).
+        SEC-safe: consumable service rebates only—no investment language.
         """
         if not engine or not trucker_id:
             return 0.0
         
         try:
             with engine.begin() as conn:
-                # Get MC number from trucker profile
                 mc_row = conn.execute(
                     text("SELECT mc_number FROM webwise.trucker_profiles WHERE id = :trucker_id"),
                     {"trucker_id": trucker_id}
@@ -42,39 +40,35 @@ class VestingService:
                 
                 mc_number = mc_row[0]
                 
-                # Calculate claimable balance: VESTED entries + LOCKED entries where unlock date has passed
+                # CREDITED = immediate rebate (new model). VESTED/LOCKED(unlocked) = legacy.
                 result = conn.execute(
                     text("""
-                        SELECT COALESCE(SUM(amount_candle), 0) as claimable
+                        SELECT COALESCE(SUM(amount_candle), 0) as balance
                         FROM webwise.driver_savings_ledger
                         WHERE driver_mc_number = :mc
-                        AND (
-                            status = 'VESTED'
-                            OR (status = 'LOCKED' AND unlocks_at <= now())
-                        )
-                        AND status != 'CLAIMED'
+                          AND status != 'CLAIMED'
+                          AND status != 'CONSUMED'
+                          AND (
+                              status IN ('CREDITED', 'VESTED')
+                              OR (status = 'LOCKED' AND unlocks_at <= now())
+                          )
                     """),
                     {"mc": mc_number}
                 ).fetchone()
                 
                 return float(result[0] or 0.0)
         except Exception as e:
-            print(f"Error calculating claimable balance: {e}")
+            print(f"Error calculating available balance: {e}")
             return 0.0
     
     @staticmethod
     def get_vesting_stats(engine: Optional[Engine], trucker_id: int) -> Dict[str, Any]:
         """
-        Get comprehensive vesting statistics for a trucker.
+        Get service credit statistics for a trucker.
         
         Returns:
-            {
-                "total_earned": float,
-                "locked_balance": float,
-                "vested_balance": float,
-                "claimable_balance": float,
-                "claimed_balance": float
-            }
+            total_earned, locked_balance (legacy), available_service_balance,
+            claimable_balance, claimed_balance, consumed_balance
         """
         if not engine or not trucker_id:
             return {
@@ -104,14 +98,15 @@ class VestingService:
                 
                 mc_number = mc_row[0]
                 
-                # Get all balances
+                # Get all balances (incl. CREDITED for immediate-use rebates)
                 stats = conn.execute(
                     text("""
                         SELECT 
                             COALESCE(SUM(amount_candle), 0) as total_earned,
                             COALESCE(SUM(CASE WHEN status = 'LOCKED' AND unlocks_at > now() THEN amount_candle ELSE 0 END), 0) as locked_balance,
-                            COALESCE(SUM(CASE WHEN status = 'VESTED' OR (status = 'LOCKED' AND unlocks_at <= now()) THEN amount_candle ELSE 0 END), 0) as vested_balance,
-                            COALESCE(SUM(CASE WHEN status = 'CLAIMED' THEN amount_candle ELSE 0 END), 0) as claimed_balance
+                            COALESCE(SUM(CASE WHEN status IN ('VESTED','CREDITED') OR (status = 'LOCKED' AND unlocks_at <= now()) THEN amount_candle ELSE 0 END), 0) as available_balance,
+                            COALESCE(SUM(CASE WHEN status = 'CLAIMED' THEN amount_candle ELSE 0 END), 0) as claimed_balance,
+                            COALESCE(SUM(CASE WHEN status = 'CONSUMED' THEN amount_candle ELSE 0 END), 0) as consumed_balance
                         FROM webwise.driver_savings_ledger
                         WHERE driver_mc_number = :mc
                     """),
@@ -122,16 +117,18 @@ class VestingService:
                 locked_balance = float(stats[1] or 0)
                 vested_balance = float(stats[2] or 0)
                 claimed_balance = float(stats[3] or 0)
+                consumed_balance = float(stats[4] or 0)
                 
-                # Claimable = vested but not yet claimed
-                claimable_balance = VestingService.get_claimable_balance(engine, trucker_id)
+                claimable_balance = VestingService.get_available_service_balance(engine, trucker_id)
                 
                 return {
                     "total_earned": total_earned,
                     "locked_balance": locked_balance,
                     "vested_balance": vested_balance,
                     "claimable_balance": claimable_balance,
-                    "claimed_balance": claimed_balance
+                    "available_service_balance": claimable_balance,
+                    "claimed_balance": claimed_balance,
+                    "consumed_balance": consumed_balance,
                 }
         except Exception as e:
             print(f"Error getting vesting stats: {e}")

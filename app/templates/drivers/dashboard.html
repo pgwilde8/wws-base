@@ -61,7 +61,7 @@
     <div class="px-4 mb-6">
         <h3 class="text-slate-500 text-[10px] uppercase font-bold mb-2 tracking-wider">Current Mission</h3>
         <div hx-get="/clients/active-load" 
-             hx-trigger="load, negotiationUpdated from:body" 
+             hx-trigger="load, every 15s, negotiationUpdated from:body" 
              hx-swap="innerHTML"
              hx-indicator="#active-load-loading">
             <!-- Loading state -->

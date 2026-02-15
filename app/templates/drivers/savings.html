@@ -59,166 +59,115 @@
         </div>
     </div>
 
-    <!-- Portfolio Summary -->
+    <!-- Automation Fuel Tank (Service Credits) -->
+    {% set balance = savings_data.claimable_balance if savings_data else 0 %}
+    {% set autopilot_runs = (balance / 3) | int %}
     <div class="px-4 mb-6">
         <div class="bg-slate-900 rounded-3xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden">
-            <div class="absolute -right-10 -top-10 bg-green-500/10 w-40 h-40 rounded-full blur-3xl"></div>
+            <div class="absolute -right-10 -top-10 bg-blue-500/10 w-40 h-40 rounded-full blur-3xl"></div>
 
             <div class="relative z-10">
-                <div class="flex justify-between items-start mb-6">
+                <div class="flex justify-between items-start mb-4">
                     <div>
-                        <h3 class="text-slate-500 text-[10px] uppercase font-black tracking-[0.2em] mb-1">Portfolio Growth</h3>
-                        <div class="text-3xl font-black text-white">${{ "{:,.2f}".format(portfolio_stats.current_value) }}</div>
-                        <div class="text-[9px] text-slate-600 mt-1">{{ "{:,.0f}".format(portfolio_stats.total_tokens) }} $CANDLE</div>
+                        <h3 class="text-slate-500 text-[10px] uppercase font-black tracking-[0.2em] mb-1">Automation Fuel Tank</h3>
+                        <div class="text-3xl font-black text-white">{{ "{:,.1f}".format(balance) }} $CANDLE</div>
+                        <div class="text-[10px] text-blue-400 mt-1 font-bold">That's enough for {{ autopilot_runs }} Autonomous Booking{{ 's' if autopilot_runs != 1 else '' }}</div>
+                    </div>
+                    <span class="bg-blue-500/20 text-blue-400 text-[10px] font-black px-3 py-1 rounded-full border border-blue-500/30">
+                        <i class="fas fa-bolt mr-1"></i>IMMEDIATE USE
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 border-t border-slate-800 pt-4 mb-4">
+                    <div>
+                        <div class="text-[9px] text-slate-500 uppercase mb-1">Credits Earned</div>
+                        <div class="text-lg font-bold text-slate-300">{{ "{:,.1f}".format(savings_data.total_candle_balance if savings_data else 0) }}</div>
+                        <div class="text-[9px] text-slate-600">From Loads</div>
                     </div>
                     <div class="text-right">
-                        <span class="bg-green-500/20 text-green-400 text-[10px] font-black px-3 py-1 rounded-full border border-green-500/30">
-                            {% if portfolio_stats.total_roi >= 0 %}+{% endif %}{{ "{:.1f}".format(portfolio_stats.roi_percentage) }}% ROI
-                        </span>
+                        <div class="text-[9px] text-amber-400 uppercase mb-1 font-bold">Credits Consumed</div>
+                        <div class="text-lg font-bold text-amber-400">{{ "{:,.1f}".format((savings_data or {}).get('consumed_balance', 0)) }}</div>
+                        <div class="text-[9px] text-slate-600">By AI</div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4 border-t border-slate-800 pt-6 mb-6">
-                    <div>
-                        <div class="text-[9px] text-slate-500 uppercase mb-1">Total Cost Basis</div>
-                        <div class="text-lg font-bold text-slate-300">${{ "{:,.2f}".format(portfolio_stats.cost_basis) }}</div>
+                <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                    <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">Power Meter</div>
+                    <div class="flex justify-between text-[10px] text-slate-500 mb-1 font-mono">
+                        <span>0</span>
+                        <span>{{ autopilot_runs }} runs</span>
                     </div>
-                    <div class="text-right">
-                        <div class="text-[9px] text-green-400 uppercase mb-1 font-bold">Net Profit</div>
-                        <div class="text-lg font-bold {% if portfolio_stats.total_roi >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
-                            {% if portfolio_stats.total_roi >= 0 %}+{% endif %}${{ "{:,.2f}".format(portfolio_stats.total_roi) }}
-                        </div>
+                    {% set fuel_raw = (balance / 15) * 100 if balance else 0 %}
+                    {% set fuel_pct = fuel_raw if fuel_raw <= 100 else 100 %}
+                    <div class="h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                        <div class="bg-green-500/80 h-full transition-all duration-500" style="width: {{ fuel_pct }}%;"></div>
                     </div>
-                </div>
-
-                <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="bg-blue-500/20 p-2 rounded-full">
-                            <i class="fas fa-gas-pump text-blue-400"></i>
-                        </div>
-                        <div>
-                            <div class="text-[10px] text-slate-500 uppercase font-bold">Fuel Equivalent</div>
-                            <div class="text-sm font-black text-blue-400">{{ "{:.1f}".format(portfolio_stats.gas_equivalent) }} Gallons</div>
-                        </div>
-                    </div>
-                    <div class="text-[9px] text-slate-600 italic">@ ${{ "{:.2f}".format(portfolio_stats.diesel_price) }}/gal</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Diamond Hands Button (only show if claimable balance > 0) -->
-    {% if savings_data and savings_data.claimable_balance and savings_data.claimable_balance > 0 %}
+    <!-- Most Recent Credit Earned (Revenue Transparency) -->
+    {% if portfolio_stats and portfolio_stats.most_recent_deposit %}
     <div class="px-4 mb-6">
-        <button 
-            hx-get="/clients/claim/modal"
-            hx-target="#claim-modal-container"
-            hx-swap="innerHTML"
-            class="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-black font-black py-4 rounded-2xl shadow-xl shadow-amber-500/30 border-2 border-amber-400/50 transition-all active:scale-95 flex items-center justify-center gap-2">
-            <i class="fas fa-gem text-xl"></i>
-            <span>DIAMOND HANDS BONUS</span>
-            <i class="fas fa-arrow-right"></i>
-        </button>
-        <p class="text-center text-[10px] text-slate-500 mt-2">Re-invest your unlocked tokens for +5% bonus</p>
-    </div>
-    {% endif %}
-
-    <!-- Most Recent Deposit -->
-    {% if portfolio_stats.most_recent_deposit %}
-    <div class="px-4 mb-6">
-        <h3 class="text-slate-500 text-[10px] uppercase font-bold mb-2 tracking-wider">Most Recent Deposit</h3>
+        <h3 class="text-slate-500 text-[10px] uppercase font-bold mb-2 tracking-wider">Earned from Last Load</h3>
         <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-xl">
             <div class="flex justify-between items-center pb-3 border-b border-slate-800/50">
                 <div>
-                    <div class="text-[10px] text-slate-500 uppercase">Load #{{ portfolio_stats.most_recent_deposit.load_id }} (2% Fee)</div>
-                    <div class="text-sm font-bold text-white">Deposit Value: <span class="text-green-400">${{ "{:,.2f}".format(portfolio_stats.most_recent_deposit.deposit_usd) }}</span></div>
+                    <div class="text-[10px] text-slate-500 uppercase">Load #{{ portfolio_stats.most_recent_deposit.load_id }} (Service Rebate)</div>
+                    <div class="text-sm font-bold text-green-400">{{ "{:,.1f}".format(portfolio_stats.most_recent_deposit.deposit_tokens) }} $CANDLE</div>
+                    <div class="text-[9px] text-slate-600 italic">Rebate from your 2% dispatch fee</div>
                 </div>
                 <div class="text-right">
-                    <div class="text-xs font-black text-white">{{ "{:,.0f}".format(portfolio_stats.most_recent_deposit.deposit_tokens) }} $CANDLE</div>
-                    <div class="text-[9px] text-slate-500">at ${{ "{:.4f}".format(portfolio_stats.current_price) }}/token</div>
+                    <div class="text-xs font-black text-white">${{ "{:,.2f}".format(portfolio_stats.most_recent_deposit.deposit_usd) }} Value</div>
+                    <div class="text-[9px] text-slate-500">Available for automation</div>
                 </div>
             </div>
 
             <div class="pt-3 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <div class="bg-green-500/20 p-1.5 rounded-full">
-                        <i class="fas fa-arrow-trend-up text-green-400 text-xs"></i>
+                        <i class="fas fa-robot text-green-400 text-xs"></i>
                     </div>
                     <div>
-                        <div class="text-[9px] text-slate-500 uppercase">Current Value</div>
-                        <div class="text-sm font-black text-green-400">${{ "{:,.2f}".format(portfolio_stats.most_recent_deposit.deposit_value_now) }}</div>
+                        <div class="text-[9px] text-slate-500 uppercase">Use For</div>
+                        <div class="text-sm font-black text-green-400">Auto-Pilot • Counter • Voice</div>
                     </div>
-                </div>
-                <div class="text-right">
-                    <span class="bg-green-900/40 text-green-400 text-[10px] font-bold px-2 py-0.5 rounded">
-                        {% if portfolio_stats.most_recent_deposit.deposit_growth >= 0 %}+{% endif %}${{ "{:,.2f}".format(portfolio_stats.most_recent_deposit.deposit_growth) }} 
-                        ({% if portfolio_stats.most_recent_deposit.deposit_growth_pct >= 0 %}+{% endif %}{{ "{:.1f}".format(portfolio_stats.most_recent_deposit.deposit_growth_pct) }}%)
-                    </span>
                 </div>
             </div>
         </div>
     </div>
     {% endif %}
 
-    <div class="grid grid-cols-2 gap-4 p-4">
-        <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg">
-            <div class="text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-1">Total Revenue</div>
-            <div class="text-2xl font-bold text-white">$0.00</div>
-            <div class="text-[9px] text-slate-600 mt-1">LIFETIME GROSS</div>
-        </div>
-        
-        <div class="bg-slate-900 p-4 rounded-xl border border-green-900/50 relative overflow-hidden shadow-lg shadow-green-900/10">
-            <div class="absolute -right-4 -top-4 bg-green-500/10 w-24 h-24 rounded-full blur-2xl"></div>
-            
-            <div class="relative z-10">
-                <div class="text-green-400 text-[10px] uppercase font-bold tracking-wider mb-1">Buyback Rewards</div>
-                <div class="text-2xl font-black text-green-400 neon-text" id="total-balance">0.00</div>
-                <div class="text-[9px] text-green-600 font-bold mt-1">TOKENS LOCKED</div>
+    <!-- Call Packs (Twilio Minutes - Separate from $CANDLE) -->
+    <div class="px-4 mb-6">
+        <h3 class="text-slate-500 text-[10px] uppercase font-bold mb-2 pl-1 tracking-wider">Call Packs</h3>
+        <div class="bg-slate-900 rounded-xl border border-slate-800 p-4 shadow-lg">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="bg-indigo-500/20 p-2 rounded-full">
+                        <i class="fas fa-phone-alt text-indigo-400"></i>
+                    </div>
+                    <div>
+                        <div class="text-slate-400 text-[10px] uppercase font-bold">Minutes Remaining</div>
+                        <div class="text-xl font-black text-white">{{ (savings_data or {}).get('minutes_remaining', 0) | int }}</div>
+                        <div class="text-[9px] text-slate-600">From Twilio packs (separate from $CANDLE)</div>
+                    </div>
+                </div>
+                <a href="#" class="text-indigo-400 text-[10px] font-bold">Buy Pack</a>
             </div>
         </div>
     </div>
 
+    <!-- Transfer Credits Section -->
     <div class="px-4 mb-6">
-        <div class="bg-gradient-to-b from-slate-900 to-slate-950 rounded-xl border border-slate-800 p-5 shadow-xl">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-slate-200 text-sm font-bold flex items-center">
-                    <i class="fas fa-vault text-yellow-500 mr-2"></i>Vesting Vault
-                </h3>
-                <span class="bg-slate-800 text-slate-400 text-[10px] px-2 py-1 rounded border border-slate-700">6 Month Lock</span>
-            </div>
-            
-            <div class="relative pt-2 pb-2">
-                <div class="flex justify-between text-[10px] text-slate-500 mb-1 font-mono">
-                    <span>Locked</span>
-                    <span>Unlocking</span>
-                </div>
-                <div class="h-3 bg-slate-800 rounded-full overflow-hidden flex border border-slate-700">
-                    <div class="w-3/4 bg-orange-500/80 striped-bg"></div>
-                    <div class="w-1/4 bg-green-500 animate-pulse"></div>
-                </div>
-                
-                <div class="text-center mt-4 bg-slate-900/50 rounded p-2 border border-slate-800/50">
-                    <div class="text-xs text-slate-400 mb-1">Next Payout Date</div>
-                    <div class="text-white font-bold text-lg tracking-widest" id="unlock-date">--/--/----</div>
-                    <div class="text-[10px] text-orange-400 font-mono mt-1" id="days-left">(-- Days Remaining)</div>
-                </div>
-                
-                <p class="text-[9px] text-slate-600 italic mt-3 text-center border-t border-slate-800 pt-2">
-                    *Leaving the fleet before vesting forfeits these tokens.
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Claim Tokens Section -->
-    <div class="px-4 mb-6">
-        <h3 class="text-slate-500 text-[10px] uppercase font-bold mb-2 pl-1 tracking-wider">Claim Tokens</h3>
+        <h3 class="text-slate-500 text-[10px] uppercase font-bold mb-2 pl-1 tracking-wider">Transfer Credits</h3>
         <div class="bg-gradient-to-br from-green-900/30 to-slate-900 rounded-xl border border-green-800/30 p-5">
             {% if savings_data and savings_data.claimable_balance > 0 %}
             <div class="mb-4">
-                <div class="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Ready to Claim</div>
+                <div class="text-[10px] text-slate-400 uppercase tracking-wider mb-1">Ready to Use</div>
                 <div class="text-3xl font-black text-green-400 neon-text">{{ "{:,.2f}".format(savings_data.claimable_balance) }}</div>
-                <div class="text-xs text-green-600 font-bold mt-1">$CANDLE TOKENS</div>
+                <div class="text-xs text-green-600 font-bold mt-1">SERVICE CREDITS</div>
             </div>
             
             {% if wallet_address %}
@@ -227,7 +176,7 @@
                 hx-target="#claim-modal-container"
                 hx-swap="innerHTML"
                 class="w-full bg-green-600 hover:bg-green-500 text-white font-black uppercase text-sm py-3 px-4 rounded-xl shadow-lg transition active:scale-95">
-                <i class="fas fa-wallet mr-2"></i>CLAIM TOKENS
+                <i class="fas fa-wallet mr-2"></i>TRANSFER CREDITS
             </button>
             {% else %}
             <button 
@@ -240,8 +189,8 @@
             {% endif %}
             {% else %}
             <div class="text-center py-4">
-                <div class="text-slate-500 text-sm mb-2">No tokens ready to claim</div>
-                <div class="text-[10px] text-slate-600">Tokens unlock after 6-month vesting period</div>
+                <div class="text-slate-500 text-sm mb-2">No service credits available</div>
+                <div class="text-[10px] text-slate-600">Earn credits from completed loads—use them for AI automation</div>
             </div>
             {% endif %}
         </div>
@@ -303,7 +252,7 @@
                                 hx-target="#modals-here"
                                 hx-swap="innerHTML"
                                 class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black py-3 rounded-xl transition shadow-lg shadow-indigo-900/40">
-                            LOAD FROM VAULT
+                            LOAD FROM CREDITS
                         </button>
                         <button class="bg-slate-800 text-slate-400 text-xs font-black py-3 rounded-xl border border-slate-700">
                             VIEW SPENDING
@@ -341,7 +290,7 @@
                                  style="width: {{ card_eligibility.vesting_progress_pct }}%;"></div>
                         </div>
                         <div class="flex justify-between mt-2">
-                            <span class="text-[9px] text-slate-500 uppercase font-bold">Vesting Progress</span>
+                            <span class="text-[9px] text-slate-500 uppercase font-bold">Card Eligibility</span>
                             <span class="text-[9px] text-indigo-400 font-bold">
                                 {% if card_eligibility.eligible %}
                                     Ready to Request!
@@ -427,50 +376,16 @@
                     mcDisplay.className = "text-xs text-slate-500 font-mono bg-slate-800 px-2 py-1 rounded";
                 }
 
-                // If we have an MC number, try to fetch savings data
+                // Optional: fetch savings data for any dynamic updates
                 if (displayMc) {
                     try {
                         const response = await fetch(`/public/savings/dashboard/${displayMc}`);
-                        
                         if (response.ok) {
                             const data = await response.json();
-
-                            // Populate Big Number
-                            if (document.getElementById('total-balance')) {
-                                document.getElementById('total-balance').innerText = data.total_candle_balance.toFixed(2);
-                            }
-
-                            // Populate Vesting Vault
-                            if (data.next_vesting_date && document.getElementById('unlock-date')) {
-                                const unlockDate = new Date(data.next_vesting_date);
-                                
-                                // Format Date nicely (e.g., "Aug 10, 2026")
-                                const options = { year: 'numeric', month: 'short', day: 'numeric' };
-                                document.getElementById('unlock-date').innerText = unlockDate.toLocaleDateString('en-US', options);
-                                
-                                // Calculate Days Remaining
-                                const now = new Date();
-                                const diffTime = unlockDate - now;
-                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-                                
-                                if (document.getElementById('days-left')) {
-                                    document.getElementById('days-left').innerText = `(${diffDays} Days to Unlock)`;
-                                    
-                                    // Make text red if it's far away, green if close
-                                    if(diffDays < 30) {
-                                        document.getElementById('days-left').className = "text-[10px] text-green-400 font-mono mt-1";
-                                    }
-                                }
-                            } else if (document.getElementById('unlock-date')) {
-                                document.getElementById('unlock-date').innerText = "No Locked Tokens";
-                                if (document.getElementById('days-left')) {
-                                    document.getElementById('days-left').innerText = "";
-                                }
-                            }
+                            // No vesting/unlock logic - credits are immediate use only
                         }
                     } catch (fetchError) {
                         console.warn("Could not fetch savings dashboard data:", fetchError);
-                        // Don't show error if endpoint doesn't exist - it's optional
                     }
                 }
 

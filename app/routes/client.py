@@ -1,6 +1,6 @@
 from typing import Optional, Dict
 
-from fastapi import APIRouter, Request, Depends, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Request, Depends, UploadFile, File, Form, HTTPException, Body
 from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy import text, func
 from sqlalchemy.orm import Session
@@ -14,6 +14,12 @@ from app.services.storage import upload_bol
 from app.services.factoring import push_invoice_to_factor
 from app.services.tokenomics import credit_driver_savings
 from app.services.buyback_notifications import BuybackNotificationService
+from app.services.email import send_negotiation_email
+from app.services.ai_logic import extract_bid_details, parse_sender_email
+from app.services.calculator import calculate_break_even, DEFAULT_FUEL_PRICE
+from app.services.market_intel import get_market_average, parse_origin_dest_states
+from app.services.ledger import issue_load_credits, AUTOPILOT_COST, estimate_credits_for_load
+from app.services.vesting import VestingService, AUTOPILOT_COST
 from app.schemas.load import LoadResponse, LoadStatus
 
 router = APIRouter()
@@ -44,16 +50,18 @@ def active_load(request: Request, user: Optional[Dict] = Depends(current_user)):
     if not trucker_id:
         return HTMLResponse(content="")
     
-    # Get most recent WON negotiation (active load)
+    # Get most recent WON negotiation (active load) with load_id
     with engine.begin() as conn:
         r = conn.execute(
             text("""
                 SELECT 
-                    id, origin, destination, final_rate, created_at
-                FROM webwise.negotiations
-                WHERE trucker_id = :trucker_id 
-                AND status = 'won'
-                ORDER BY created_at DESC
+                    n.id, n.origin, n.destination, n.final_rate, n.created_at, n.load_id,
+                    tp.display_name
+                FROM webwise.negotiations n
+                JOIN webwise.trucker_profiles tp ON n.trucker_id = tp.id
+                WHERE n.trucker_id = :trucker_id 
+                AND n.status = 'won'
+                ORDER BY n.created_at DESC
                 LIMIT 1
             """),
             {"trucker_id": trucker_id}
@@ -69,12 +77,34 @@ def active_load(request: Request, user: Optional[Dict] = Depends(current_user)):
                 )
             return {"active": False}
         
+        load_id = str(row.load_id).strip() if row.load_id else None
+        display_name = (row.display_name or "").strip().lower()
+        unread_count = 0
+        
+        if load_id and display_name:
+            unread = conn.execute(
+                text("""
+                    SELECT COUNT(*) FROM webwise.messages
+                    WHERE LOWER(SPLIT_PART(SPLIT_PART(recipient_tagged, '@', 1), '+', 1)) = :display_name
+                    AND load_id = :load_id AND (is_read IS NULL OR is_read = false)
+                """),
+                {"display_name": display_name, "load_id": load_id},
+            ).scalar()
+            unread_count = unread or 0
+        
+        final_rate = float(row.final_rate) if row.final_rate else 0.0
+        credits_preview = estimate_credits_for_load(final_rate) if final_rate > 0 else {"credits_candle": 0, "credits_usd": 0}
+
         active_load_data = {
             "id": row.id,
+            "load_id": load_id or "UNKNOWN",
             "origin": row.origin or "Unknown",
             "destination": row.destination or "Unknown",
-            "final_rate": float(row.final_rate) if row.final_rate else 0.0,
-            "created_at": row.created_at
+            "final_rate": final_rate,
+            "created_at": row.created_at,
+            "unread_count": unread_count,
+            "estimated_credits_candle": credits_preview["credits_candle"],
+            "estimated_credits_usd": credits_preview["credits_usd"],
         }
     
     if request.headers.get("HX-Request"):
@@ -116,6 +146,637 @@ def my_contribution(request: Request, user: Optional[Dict] = Depends(current_use
         resp.headers["HX-Trigger"] = "contributionStatsLoaded"
         return resp
     return stats
+
+
+@router.get("/clients/terminal/{load_id}", response_class=HTMLResponse)
+def negotiation_terminal(request: Request, load_id: str, user: Optional[Dict] = Depends(current_user)):
+    """
+    Negotiation Command Center: broker messages + AI suggestion + one-tap actions.
+    """
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    with engine.begin() as conn:
+        r = conn.execute(
+            text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        )
+        row = r.first()
+        if not row:
+            return RedirectResponse(url="/clients/dashboard", status_code=303)
+        display_name = (row.display_name or "").strip().lower()
+        if not display_name:
+            return RedirectResponse(url="/clients/dashboard", status_code=303)
+
+        messages = conn.execute(
+            text("""
+                SELECT id, sender_email, subject, body_text, is_read, received_at
+                FROM webwise.messages
+                WHERE LOWER(SPLIT_PART(SPLIT_PART(recipient_tagged, '@', 1), '+', 1)) = :display_name
+                AND load_id = :load_id
+                ORDER BY received_at ASC
+                LIMIT 50
+            """),
+            {"display_name": display_name, "load_id": load_id},
+        ).fetchall()
+
+    msgs = [
+        {
+            "id": m.id,
+            "sender_email": m.sender_email,
+            "subject": m.subject,
+            "body_text": m.body_text or "",
+            "is_read": m.is_read,
+            "received_at": m.received_at,
+        }
+        for m in messages
+    ]
+
+    # AI recommendation: parse last message for offer, suggest target
+    latest_offer = None
+    target_price = None
+    gap = None
+    broker_ready = False
+    if msgs:
+        last_body = msgs[-1].get("body_text", "")
+        parsed = extract_bid_details(last_body)
+        latest_offer = parsed.get("extracted_offer")
+        broker_ready = parsed.get("broker_ready", False)
+        if latest_offer is not None:
+            target_price = int(latest_offer) + 150  # suggest +$150 counter
+            gap = target_price - int(latest_offer)
+
+    # Auto-Pilot settings for this load
+    trucker_id = row.id
+    autopilot_row = None
+    with engine.begin() as conn2:
+        autopilot_row = conn2.execute(
+            text("""
+                SELECT floor_price, target_price, is_autopilot
+                FROM webwise.autopilot_settings
+                WHERE trucker_id = :tid AND load_id = :load_id
+            """),
+            {"tid": trucker_id, "load_id": load_id},
+        ).first()
+
+    is_autopilot = bool(autopilot_row and autopilot_row[2]) if autopilot_row else False
+    autopilot_floor = float(autopilot_row[0]) if autopilot_row and autopilot_row[0] is not None else (int(latest_offer * 0.85) if latest_offer else 0)
+    autopilot_target = float(autopilot_row[1]) if autopilot_row and autopilot_row[1] is not None else (target_price or 0)
+
+    # Load info: miles, origin, destination for market intel
+    load_miles = None
+    load_origin = None
+    load_dest = None
+    with engine.begin() as conn3:
+        load_row = conn3.execute(
+            text("SELECT miles, origin, destination FROM webwise.loads WHERE ref_id = :load_id"),
+            {"load_id": load_id},
+        ).first()
+        if load_row and len(load_row) >= 3:
+            load_miles = int(load_row[0]) if load_row[0] is not None else None
+            load_origin = load_row[1] if len(load_row) > 1 else None
+            load_dest = load_row[2] if len(load_row) > 2 else None
+
+    miles_for_market = load_miles if load_miles and load_miles > 0 else 500
+    origin_state, dest_state = parse_origin_dest_states(load_origin or "", load_dest or "")
+    intel = get_market_average(origin_state or "", dest_state or "")
+    market_rpm = intel["market_rpm"]
+    market_price = round(miles_for_market * market_rpm, 2)
+
+    driver_balance = VestingService.get_claimable_balance(engine, trucker_id)
+    can_use_autopilot = driver_balance >= AUTOPILOT_COST
+
+    settings = {
+        "is_autopilot": is_autopilot,
+        "floor_price": autopilot_floor,
+        "target_price": autopilot_target,
+    }
+
+    return templates.TemplateResponse(
+        "drivers/terminal.html",
+        {
+            "request": request,
+            "load_id": load_id,
+            "messages": msgs,
+            "latest_offer": latest_offer,
+            "target_price": target_price,
+            "gap": gap,
+            "broker_ready": broker_ready,
+            "settings": settings,
+            "fuel_avg": DEFAULT_FUEL_PRICE,
+            "load_miles": load_miles or 500,
+            "market_price": market_price,
+            "market_rpm": market_rpm,
+            "driver_balance": driver_balance,
+            "autopilot_cost": AUTOPILOT_COST,
+            "can_use_autopilot": can_use_autopilot,
+        },
+    )
+
+
+@router.post("/clients/negotiate/{load_id}/counter", response_class=HTMLResponse)
+def negotiate_counter(
+    load_id: str,
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+    increment: int = Form(100),
+):
+    """
+    Driver taps Counter +$100 (or custom increment). Finds broker from last message,
+    computes new rate, sends negotiation email. HTMX: hx-swap=none, then trigger refresh.
+    """
+    if not user or user.get("role") != "client":
+        if request.headers.get("HX-Request"):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    with engine.begin() as conn:
+        r = conn.execute(
+            text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        )
+        row = r.first()
+        if not row:
+            raise HTTPException(status_code=403, detail="No trucker profile")
+        trucker_id = row.id
+        display_name = (row.display_name or "").strip().lower()
+        if not display_name:
+            raise HTTPException(status_code=400, detail="Display name required")
+
+        # Last message for this load (broker's reply)
+        msgs = conn.execute(
+            text("""
+                SELECT sender_email, subject, body_text
+                FROM webwise.messages
+                WHERE LOWER(SPLIT_PART(SPLIT_PART(recipient_tagged, '@', 1), '+', 1)) = :display_name
+                AND load_id = :load_id
+                ORDER BY received_at DESC
+                LIMIT 1
+            """),
+            {"display_name": display_name, "load_id": load_id},
+        ).fetchall()
+
+    if not msgs:
+        raise HTTPException(status_code=400, detail="No broker messages for this load")
+
+    last = msgs[0]
+    broker_email = parse_sender_email(last.sender_email or "")
+    if not broker_email or "@" not in broker_email:
+        raise HTTPException(status_code=400, detail="Could not extract broker email")
+
+    parsed = extract_bid_details(last.body_text or "")
+    base_offer = parsed.get("extracted_offer")
+    current_rate = float(base_offer) if base_offer is not None else 0.0
+    new_rate = int(current_rate) + int(increment)
+
+    # Find or create negotiation
+    with engine.begin() as conn:
+        neg = conn.execute(
+            text("""
+                SELECT id FROM webwise.negotiations
+                WHERE load_id = :load_id AND trucker_id = :trucker_id
+                ORDER BY id DESC LIMIT 1
+            """),
+            {"load_id": load_id, "trucker_id": trucker_id},
+        ).first()
+        if neg:
+            negotiation_id = neg[0]
+        else:
+            # Create minimal negotiation for tracking
+            r2 = conn.execute(
+                text("""
+                    INSERT INTO webwise.negotiations (load_id, trucker_id, original_rate, target_rate, status)
+                    VALUES (:load_id, :trucker_id, :rate, :target, 'sent')
+                    RETURNING id
+                """),
+                {
+                    "load_id": load_id,
+                    "trucker_id": trucker_id,
+                    "rate": current_rate,
+                    "target": new_rate,
+                },
+            )
+            negotiation_id = r2.scalar()
+
+    subject = f"Re: {last.subject}" if last.subject else f"Counter Offer - Load {load_id}"
+    body = f"We can do ${new_rate:,} all-in. Let me know."
+    result = send_negotiation_email(
+        to_email=broker_email,
+        subject=subject,
+        body=body,
+        load_id=load_id,
+        negotiation_id=negotiation_id,
+        driver_name=display_name,
+        load_source=None,
+    )
+
+    if result.get("status") != "success":
+        raise HTTPException(status_code=500, detail=result.get("message", "Failed to send email"))
+
+    # HTMX: swap=none, trigger refresh so terminal updates
+    return HTMLResponse(
+        content="",
+        status_code=204,
+        headers={"HX-Trigger": "negotiationUpdated"},
+    )
+
+
+@router.post("/clients/negotiate/{load_id}/counter-to-market", response_class=HTMLResponse)
+def negotiate_counter_to_market(
+    load_id: str,
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+):
+    """
+    Counter at market rate: uses lane data to send broker a fair-market counter.
+    """
+    if not user or user.get("role") != "client":
+        if request.headers.get("HX-Request"):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    with engine.begin() as conn:
+        r = conn.execute(
+            text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        )
+        row = r.first()
+        if not row:
+            raise HTTPException(status_code=403, detail="No trucker profile")
+        trucker_id = row.id
+        display_name = (row.display_name or "").strip().lower()
+        if not display_name:
+            raise HTTPException(status_code=400, detail="Display name required")
+
+        msgs = conn.execute(
+            text("""
+                SELECT sender_email, subject, body_text
+                FROM webwise.messages
+                WHERE LOWER(SPLIT_PART(SPLIT_PART(recipient_tagged, '@', 1), '+', 1)) = :display_name
+                AND load_id = :load_id
+                ORDER BY received_at DESC LIMIT 1
+            """),
+            {"display_name": display_name, "load_id": load_id},
+        ).fetchall()
+
+        load_row = conn.execute(
+            text("SELECT miles, origin, destination FROM webwise.loads WHERE ref_id = :load_id"),
+            {"load_id": load_id},
+        ).first()
+
+    if not msgs:
+        raise HTTPException(status_code=400, detail="No broker messages for this load")
+
+    last = msgs[0]
+    broker_email = parse_sender_email(last.sender_email or "")
+    if not broker_email or "@" not in broker_email:
+        raise HTTPException(status_code=400, detail="Could not extract broker email")
+
+    miles = 500
+    if load_row and load_row[0]:
+        miles = int(load_row[0])
+    origin_state, dest_state = parse_origin_dest_states(
+        load_row[1] if load_row and len(load_row) > 1 else "",
+        load_row[2] if load_row and len(load_row) > 2 else "",
+    )
+    intel = get_market_average(origin_state or "", dest_state or "")
+    market_rpm = intel["market_rpm"]
+    new_rate = int(miles * market_rpm)
+
+    with engine.begin() as conn:
+        neg = conn.execute(
+            text("""
+                SELECT id FROM webwise.negotiations
+                WHERE load_id = :load_id AND trucker_id = :trucker_id
+                ORDER BY id DESC LIMIT 1
+            """),
+            {"load_id": load_id, "trucker_id": trucker_id},
+        ).first()
+        if neg:
+            negotiation_id = neg[0]
+        else:
+            r2 = conn.execute(
+                text("""
+                    INSERT INTO webwise.negotiations (load_id, trucker_id, original_rate, target_rate, status)
+                    VALUES (:load_id, :trucker_id, 0, :target, 'sent')
+                    RETURNING id
+                """),
+                {"load_id": load_id, "trucker_id": trucker_id, "target": new_rate},
+            )
+            negotiation_id = r2.scalar()
+
+    subject = f"Re: {last.subject}" if last.subject else f"Counter Offer - Load {load_id}"
+    body = f"Based on current lane rates (${market_rpm:.2f}/mi), we can do ${new_rate:,} all-in. Fair market for this run. Let me know."
+    result = send_negotiation_email(
+        to_email=broker_email,
+        subject=subject,
+        body=body,
+        load_id=load_id,
+        negotiation_id=negotiation_id,
+        driver_name=display_name,
+        load_source=None,
+    )
+
+    if result.get("status") != "success":
+        raise HTTPException(status_code=500, detail=result.get("message", "Failed to send email"))
+
+    return HTMLResponse(
+        content="",
+        status_code=204,
+        headers={"HX-Trigger": "negotiationUpdated"},
+    )
+
+
+@router.post("/clients/negotiate/{load_id}/accept", response_class=HTMLResponse)
+def negotiate_accept(
+    load_id: str,
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+):
+    """
+    Driver accepts broker's offer. Marks negotiation as WON with extracted rate.
+    """
+    if not user or user.get("role") != "client":
+        if request.headers.get("HX-Request"):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    with engine.begin() as conn:
+        r = conn.execute(
+            text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        )
+        row = r.first()
+        if not row:
+            raise HTTPException(status_code=403, detail="No trucker profile")
+        trucker_id = row.id
+
+        # Last message for rate extraction
+        msgs = conn.execute(
+            text("""
+                SELECT body_text FROM webwise.messages
+                WHERE LOWER(SPLIT_PART(SPLIT_PART(recipient_tagged, '@', 1), '+', 1)) = :dn
+                AND load_id = :load_id
+                ORDER BY received_at DESC LIMIT 1
+            """),
+            {"dn": (row.display_name or "").strip().lower(), "load_id": load_id},
+        ).first()
+        parsed = extract_bid_details(msgs.body_text if msgs else "") if msgs else {}
+        final_rate = parsed.get("extracted_offer")
+
+        neg = conn.execute(
+            text("""
+                SELECT id FROM webwise.negotiations
+                WHERE load_id = :load_id AND trucker_id = :trucker_id
+                ORDER BY id DESC LIMIT 1
+            """),
+            {"load_id": load_id, "trucker_id": trucker_id},
+        ).first()
+
+    if not neg:
+        raise HTTPException(status_code=400, detail="No negotiation found for this load")
+
+    final_rate_val = float(final_rate) if final_rate is not None else 0.0
+
+    with engine.begin() as conn:
+        conn.execute(
+            text("""
+                UPDATE webwise.negotiations
+                SET status = 'won', final_rate = :rate, updated_at = now()
+                WHERE id = :id
+            """),
+            {"id": neg[0], "rate": final_rate_val},
+        )
+
+    credits_earned = 0.0
+    if final_rate_val > 0:
+        credits_earned = issue_load_credits(engine, trucker_id, load_id, final_rate_val)
+        if credits_earned > 0 and engine:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("""
+                        INSERT INTO webwise.notifications (trucker_id, message, notif_type, is_read)
+                        VALUES (:trucker_id, :message, 'LOAD_WON', false)
+                    """),
+                    {
+                        "trucker_id": trucker_id,
+                        "message": f"✅ Load accepted! +{credits_earned:.2f} $CANDLE credited to your vault.",
+                    },
+                )
+
+    return HTMLResponse(
+        content="",
+        status_code=204,
+        headers={"HX-Trigger": "negotiationUpdated"},
+    )
+
+
+@router.post("/clients/negotiate/{load_id}/ignore", response_class=HTMLResponse)
+def negotiate_ignore(
+    load_id: str,
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+):
+    """
+    Driver ignores this load. Marks messages as read and redirects to dashboard.
+    """
+    if not user or user.get("role") != "client":
+        if request.headers.get("HX-Request"):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    with engine.begin() as conn:
+        r = conn.execute(
+            text("SELECT display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        )
+        row = r.first()
+        if not row:
+            return RedirectResponse(url="/clients/dashboard", status_code=303)
+        display_name = (row.display_name or "").strip().lower()
+        if not display_name:
+            return RedirectResponse(url="/clients/dashboard", status_code=303)
+
+        conn.execute(
+            text("""
+                UPDATE webwise.messages
+                SET is_read = true
+                WHERE LOWER(SPLIT_PART(SPLIT_PART(recipient_tagged, '@', 1), '+', 1)) = :dn
+                AND load_id = :load_id
+            """),
+            {"dn": display_name, "load_id": load_id},
+        )
+
+    if request.headers.get("HX-Request"):
+        return HTMLResponse(
+            content="",
+            status_code=204,
+            headers={"HX-Trigger": "negotiationUpdated"},
+        )
+    return RedirectResponse(url="/clients/dashboard", status_code=303)
+
+
+@router.post("/clients/load/{load_id}/toggle-autopilot", response_class=HTMLResponse)
+def toggle_autopilot(
+    load_id: str,
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+    enable: Optional[str] = Form(None),
+    floor_price: Optional[float] = Form(None),
+    target_price: Optional[float] = Form(None),
+    miles: Optional[int] = Form(None),
+):
+    """
+    Toggle Auto-Pilot for this load. When enabling, runs break-even math to set floor/target.
+    Uses load miles from DB, or miles from form, or 500 as fallback.
+    """
+    if not user or user.get("role") != "client":
+        if request.headers.get("HX-Request"):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=503, detail="Database not configured")
+
+    with engine.begin() as conn:
+        r = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        )
+        row = r.first()
+        if not row:
+            raise HTTPException(status_code=403, detail="No trucker profile")
+        trucker_id = row.id
+
+        enable_autopilot = enable in ("1", "true", "on", "yes")
+        if enable_autopilot:
+            balance = VestingService.get_claimable_balance(engine, trucker_id)
+            if balance < AUTOPILOT_COST:
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Insufficient $CANDLE balance. Need {AUTOPILOT_COST}, have {balance:.2f}.",
+                )
+            # 1. Fetch load miles (load_id in terminal = ref_id in loads)
+            load_miles = miles
+            if load_miles is None and engine:
+                load_row = conn.execute(
+                    text("SELECT miles FROM webwise.loads WHERE ref_id = :load_id"),
+                    {"load_id": load_id},
+                ).first()
+                if load_row and load_row[0] is not None:
+                    load_miles = int(load_row[0])
+            if load_miles is None:
+                load_miles = 500  # Fallback when unknown
+
+            # 2. Run break-even math
+            stats = calculate_break_even(load_miles)
+            fl = int(stats["suggested_floor"])
+            tg = int(stats["suggested_floor"]) + 200
+
+            # Allow form override if driver provided explicit values
+            if floor_price is not None and floor_price > 0:
+                fl = int(floor_price)
+            if target_price is not None and target_price > 0:
+                tg = int(target_price)
+
+            conn.execute(
+                text("""
+                    INSERT INTO webwise.autopilot_settings (trucker_id, load_id, floor_price, target_price, is_autopilot, updated_at)
+                    VALUES (:tid, :load_id, :floor, :target, true, now())
+                    ON CONFLICT (trucker_id, load_id) DO UPDATE
+                    SET floor_price = :floor, target_price = :target, is_autopilot = true, updated_at = now()
+                """),
+                {"tid": trucker_id, "load_id": load_id, "floor": fl, "target": tg},
+            )
+        else:
+            conn.execute(
+                text("""
+                    INSERT INTO webwise.autopilot_settings (trucker_id, load_id, floor_price, target_price, is_autopilot, updated_at)
+                    VALUES (:tid, :load_id, 0, 0, false, now())
+                    ON CONFLICT (trucker_id, load_id) DO UPDATE
+                    SET is_autopilot = false, updated_at = now()
+                """),
+                {"tid": trucker_id, "load_id": load_id},
+            )
+
+    return HTMLResponse(
+        content="",
+        status_code=204,
+        headers={"HX-Trigger": "negotiationUpdated,autopilotToggled"},
+    )
+
+
+@router.get("/clients/inbox")
+def driver_inbox(
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+    load_id: Optional[str] = None,
+):
+    """
+    Returns broker reply messages for the logged-in driver.
+    Messages are matched by recipient_tagged (e.g. seth+TEST123@... -> driver 'seth').
+    Optional load_id filter to show only messages for a specific load.
+    """
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        return {"messages": []} if not request.headers.get("HX-Request") else HTMLResponse(content="")
+
+    with engine.begin() as conn:
+        r = conn.execute(
+            text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        )
+        row = r.first()
+        if not row:
+            return {"messages": []} if not request.headers.get("HX-Request") else HTMLResponse(content="")
+
+        display_name = (row.display_name or "").strip().lower()
+        if not display_name:
+            return {"messages": []} if not request.headers.get("HX-Request") else HTMLResponse(content="")
+
+        # Match recipient_tagged like 'seth+TEST123@...' -> driver part = 'seth'
+        query = text("""
+            SELECT id, sender_email, subject, body_text, load_id, is_read, received_at
+            FROM webwise.messages
+            WHERE LOWER(SPLIT_PART(SPLIT_PART(recipient_tagged, '@', 1), '+', 1)) = :display_name
+            AND (:load_id IS NULL OR load_id = :load_id)
+            ORDER BY received_at DESC
+            LIMIT 50
+        """)
+        rows = conn.execute(
+            query,
+            {"display_name": display_name, "load_id": load_id},
+        ).fetchall()
+
+    messages = [
+        {
+            "id": r.id,
+            "sender_email": r.sender_email,
+            "subject": r.subject,
+            "body_text": (r.body_text or "")[:500],
+            "load_id": r.load_id,
+            "is_read": r.is_read,
+            "received_at": r.received_at.isoformat() if r.received_at else None,
+        }
+        for r in rows
+    ]
+
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse(
+            "drivers/partials/inbox_messages.html",
+            {"request": request, "messages": messages},
+        )
+    return {"messages": messages}
 
 
 @router.get("/clients/notifications/poll", response_class=HTMLResponse)
@@ -905,16 +1566,19 @@ def view_savings_page(request: Request, user: Optional[Dict] = Depends(current_u
                     card_eligibility["current_balance_usd"] = float(card_row[0] or 0)
                     card_eligibility["card_last_four"] = card_row[1]
         
+        vesting_stats = VestingService.get_vesting_stats(engine, trucker_id) if trucker_id else {}
         savings_data = {
             "mc_number": mc_number,
             "total_candle_balance": total_balance,
             "locked_balance": locked_balance,
             "unlocked_balance": unlocked_balance,
             "claimable_balance": claimable_balance,
+            "consumed_balance": vesting_stats.get("consumed_balance", 0),
             "next_vesting_date": next_vesting_date.isoformat() if next_vesting_date else None,
             "days_until_unlock": days_until_unlock,
             "recent_transactions": recent_transactions,
-            "transaction_count": len(recent_transactions)
+            "transaction_count": len(recent_transactions),
+            "minutes_remaining": 0,  # TODO: Call Packs (Twilio) - separate from $CANDLE
         }
     
     return templates.TemplateResponse(
