@@ -9,3 +9,5 @@ openai
 jinja2
 python-multipart
 boto3
+Pillow
+img2pdf

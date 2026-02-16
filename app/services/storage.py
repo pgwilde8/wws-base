@@ -1,7 +1,8 @@
+import io
 import os
+from datetime import datetime
 
 import boto3
-from botocore.exceptions import NoCredentialsError
 from fastapi import UploadFile
 
 from app.core.config import settings
@@ -95,3 +96,57 @@ async def upload_bol(file: UploadFile, mc_number: str, load_id: str) -> str:
         traceback.print_exc()
         # Re-raise so route can catch and return detailed error
         raise ValueError(error_msg) from e
+
+
+def _image_to_pdf(content: bytes, content_type: str) -> bytes:
+    """Convert JPG/PNG image bytes to single-page PDF. Returns PDF bytes."""
+    import img2pdf
+    pdf_bytes = img2pdf.convert(io.BytesIO(content))
+    return pdf_bytes
+
+
+async def upload_load_document(
+    file: UploadFile,
+    trucker_id: int,
+    load_id: str,
+    doc_type: str = "BOL",
+) -> str:
+    """
+    Upload load document (BOL, RateCon, Lumper). Converts images to PDF for professionalism.
+    Path: {prefix}/trucker_{id}/load_{id}/{doc_type}_{timestamp}.pdf
+    Returns public file_url.
+    """
+    prefix = settings.STORAGE_BUCKET_PREFIX.rstrip("/")
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    ext = (file.filename or "").split(".")[-1].lower() if "." in (file.filename or "") else "jpg"
+    content_type = (file.content_type or "").lower()
+
+    await file.seek(0)
+    content = await file.read()
+    if not content:
+        raise ValueError("File content is empty")
+
+    is_image = ext in ("jpg", "jpeg", "png", "gif", "webp") or "image/" in content_type
+    target_ext = "pdf"
+    target_content_type = "application/pdf"
+
+    if is_image:
+        content = _image_to_pdf(content, content_type)
+        target_ext = "pdf"
+        target_content_type = "application/pdf"
+
+    file_path = f"{prefix}/trucker_{trucker_id}/load_{load_id}/{doc_type}_{timestamp}.{target_ext}"
+
+    if not DO_SPACES_KEY or not DO_SPACES_SECRET:
+        print("⚠️  WARNING: No DigitalOcean Keys. Returning MOCK URL.")
+        return f"http://localhost:8990/mock-storage/{file_path}"
+
+    s3 = get_s3_client()
+    s3.put_object(
+        Bucket=DO_SPACES_BUCKET,
+        Key=file_path,
+        Body=content,
+        ACL="public-read",
+        ContentType=target_content_type,
+    )
+    return f"{DO_SPACES_ENDPOINT}/{DO_SPACES_BUCKET}/{file_path}"

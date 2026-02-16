@@ -13,31 +13,24 @@ from app.core.deps import templates, current_user, engine, get_db
 from app.services.ai_agent import AIAgentService
 from app.services.negotiation import save_negotiation
 from app.services.payments import RevenueService
-from app.services.storage import upload_bol
-from app.services.factoring import push_invoice_to_factor
+from app.services.storage import upload_bol, upload_load_document
+from app.services.factoring import push_invoice_to_factor, send_packet_to_factor
 from app.services.tokenomics import credit_driver_savings
 from app.services.buyback_notifications import BuybackNotificationService
 from app.services.email import send_negotiation_email
 from app.services.ai_logic import extract_bid_details, parse_sender_email
 from app.services.calculator import calculate_break_even, DEFAULT_FUEL_PRICE
 from app.services.market_intel import get_market_average, parse_origin_dest_states
-from app.services.ledger import issue_load_credits, record_usage, AUTOPILOT_COST, estimate_credits_for_load, OUTBOUND_EMAIL_COST
+from app.services.ledger import issue_load_credits, process_load_settlement, record_usage, AUTOPILOT_COST, estimate_credits_for_load, OUTBOUND_EMAIL_COST
 from app.services.vesting import VestingService
 from app.schemas.load import LoadResponse, LoadStatus
 
 router = APIRouter()
 
 
-@router.get("/drivers/dashboard")
+@router.get("/drivers/dashboard", response_class=HTMLResponse)
 def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_user)):
-    if not user or user.get("role") != "client":
-        return RedirectResponse(url="/login/client", status_code=303)
-    return templates.TemplateResponse("drivers/dashboard.html", {"request": request, "user": user})
-
-
-@router.get("/drivers/dashboard2", response_class=HTMLResponse)
-def dashboard2(request: Request, user: Optional[Dict] = Depends(current_user)):
-    """GCD Command Center - Live Play-by-Play dashboard with Active Negotiations."""
+    """GCD Command Center - Primary driver dashboard with Active Negotiations."""
     if not user or user.get("role") != "client":
         return RedirectResponse(url="/login/client", status_code=303)
     if not engine:
@@ -95,6 +88,111 @@ def dashboard2(request: Request, user: Optional[Dict] = Depends(current_user)):
             "balance": balance_val,
             "is_new_driver": is_new_driver,
             "scout_api_key_display": api_key_display,
+        },
+    )
+
+
+@router.get("/drivers/dashboard-legacy", response_class=HTMLResponse)
+def dashboard_legacy(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Legacy dashboard (dashboard.html). Use /drivers/dashboard for Command Center."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    return templates.TemplateResponse("drivers/dashboard.html", {"request": request, "user": user})
+
+
+@router.get("/drivers/dashboard2", response_class=HTMLResponse)
+def dashboard2_redirect(request: Request):
+    """Redirect to canonical dashboard URL."""
+    return RedirectResponse(url="/drivers/dashboard", status_code=303)
+
+
+@router.get("/drivers/uploads", response_class=HTMLResponse)
+def driver_uploads_page(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Paperwork Automation - dedicated page for BOL/RateCon/Lumper uploads on won loads."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not available")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("""
+                SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number
+                FROM webwise.trucker_profiles tp WHERE tp.user_id = :uid
+            """),
+            {"uid": user.get("id")},
+        ).first()
+    has_display_name = row and (row.display_name or "").strip()
+    mc_val = (row.mc_number or "").strip() if row else ""
+    dot_val = (row.dot_number or "").strip() if row else ""
+    has_mc_or_dot = bool(mc_val or dot_val)
+    if not row or not has_display_name or not has_mc_or_dot:
+        return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+    trucker_id = row.id
+    trucker = {"id": trucker_id, "display_name": row.display_name or "Driver", "mc_number": mc_val or dot_val or "—"}
+    balance = VestingService.get_claimable_balance(engine, trucker_id) or 0
+
+    won_loads = []
+    try:
+        with engine.begin() as conn:
+            rows = conn.execute(
+                text("""
+                    SELECT n.load_id, n.origin, n.destination, n.final_rate, n.created_at,
+                           n.factoring_status
+                    FROM webwise.negotiations n
+                    WHERE n.trucker_id = :tid AND n.status = 'won'
+                    ORDER BY n.created_at DESC
+                    LIMIT 20
+                """),
+                {"tid": trucker_id},
+            ).fetchall()
+    except ProgrammingError:
+        with engine.begin() as conn:
+            rows = conn.execute(
+                text("""
+                    SELECT n.load_id, n.origin, n.destination, n.final_rate, n.created_at,
+                           NULL as factoring_status
+                    FROM webwise.negotiations n
+                    WHERE n.trucker_id = :tid AND n.status = 'won'
+                    ORDER BY n.created_at DESC
+                    LIMIT 20
+                """),
+                {"tid": trucker_id},
+            ).fetchall()
+
+    for r in rows:
+        load_id = str(r.load_id or "").strip() if r.load_id else ""
+        if not load_id:
+            continue
+        final_rate = float(r.final_rate or 0)
+        credits = estimate_credits_for_load(final_rate)
+        factoring_status = getattr(r, "factoring_status", None) or ""
+
+        has_bol = False
+        with engine.begin() as conn2:
+            bol_row = conn2.execute(
+                text("SELECT 1 FROM webwise.load_documents WHERE load_id = :load_id AND trucker_id = :tid AND doc_type = 'BOL'"),
+                {"load_id": load_id, "tid": trucker_id},
+            ).first()
+            has_bol = bol_row is not None
+
+        won_loads.append({
+            "load_id": load_id,
+            "origin": r.origin or "Unknown",
+            "destination": r.destination or "Unknown",
+            "final_rate": final_rate,
+            "created_at": r.created_at,
+            "estimated_credits_candle": credits.get("credits_candle", 0),
+            "has_bol": has_bol,
+            "factoring_status": factoring_status,
+        })
+
+    return templates.TemplateResponse(
+        "drivers/driver_uploads.html",
+        {
+            "request": request,
+            "trucker": trucker,
+            "balance": balance,
+            "won_loads": won_loads,
         },
     )
 
@@ -823,7 +921,7 @@ def onboarding_complete(request: Request, user: Optional[Dict] = Depends(current
             {"uid": user.get("id")},
         )
     response = HTMLResponse(content="")
-    response.headers["HX-Redirect"] = "/drivers/dashboard2"
+    response.headers["HX-Redirect"] = "/drivers/dashboard"
     return response
 
 
@@ -1057,6 +1155,18 @@ def negotiation_terminal(request: Request, load_id: str, user: Optional[Dict] = 
     driver_balance = VestingService.get_claimable_balance(engine, trucker_id)
     can_use_autopilot = driver_balance >= AUTOPILOT_COST
 
+    # Is this load WON? (driver can upload BOL)
+    is_won_load = False
+    final_rate = 0.0
+    with engine.begin() as conn_won:
+        won_row = conn_won.execute(
+            text("SELECT final_rate FROM webwise.negotiations WHERE load_id = :load_id AND trucker_id = :tid AND status = 'won'"),
+            {"load_id": load_id, "tid": trucker_id},
+        ).first()
+        if won_row:
+            is_won_load = True
+            final_rate = float(won_row[0] or 0)
+
     # Mission Accomplished: Rate Con detected → 3.0 $CANDLE deducted recently?
     show_mission_accomplished = False
     with engine.begin() as conn_ma:
@@ -1101,6 +1211,8 @@ def negotiation_terminal(request: Request, load_id: str, user: Optional[Dict] = 
             "can_use_autopilot": can_use_autopilot,
             "show_mission_accomplished": show_mission_accomplished,
             "assigned_truck": assigned_truck,
+            "is_won_load": is_won_load,
+            "final_rate": final_rate,
         },
     )
 
@@ -1566,6 +1678,142 @@ def negotiate_ignore(
             headers={"HX-Trigger": "negotiationUpdated"},
         )
     return RedirectResponse(url="/drivers/dashboard", status_code=303)
+
+
+@router.post("/drivers/loads/{load_id}/upload-document", response_class=HTMLResponse)
+async def driver_upload_document(
+    load_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    doc_type: str = Form("BOL"),
+    user: Optional[Dict] = Depends(current_user),
+):
+    """
+    Driver uploads BOL/RateCon/Lumper. Converts images to PDF, stores in Spaces,
+    records in load_documents. On BOL upload, triggers $CANDLE refill (21% of 2% fee).
+    """
+    if not user or user.get("role") != "client":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not available")
+    doc_type = (doc_type or "BOL").strip().upper()
+    if doc_type not in ("BOL", "RATECON", "LUMPER"):
+        doc_type = "BOL"
+
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            raise HTTPException(status_code=403, detail="Trucker profile not found")
+        trucker_id = row[0]
+
+        neg = conn.execute(
+            text("""
+                SELECT n.id, n.final_rate FROM webwise.negotiations n
+                WHERE n.load_id = :load_id AND n.trucker_id = :tid AND n.status = 'won'
+            """),
+            {"load_id": load_id, "tid": trucker_id},
+        ).first()
+        if not neg:
+            raise HTTPException(status_code=404, detail="Load not found or not yours")
+
+    final_rate = float(neg.final_rate or 0)
+    # 1. Successful upload to Spaces (images auto-converted to PDF)
+    try:
+        file_url = await upload_load_document(file, trucker_id, load_id, doc_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # 2. Update document table
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO webwise.load_documents (load_id, trucker_id, doc_type, file_url, processed)
+                    VALUES (:load_id, :tid, :doc_type, :url, false)
+                """),
+                {"load_id": load_id, "tid": trucker_id, "doc_type": doc_type, "url": file_url},
+            )
+    except ProgrammingError:
+        pass
+
+    # 3. TRIGGER THE REFILL (moment file hits Spaces)
+    # dispatch_fee = final_rate * 0.02; candle_kickback = dispatch_fee * 0.21 → add to driver ledger
+    if doc_type == "BOL" and final_rate > 0:
+        with engine.begin() as conn:
+            existing = conn.execute(
+                text("""
+                    SELECT 1 FROM webwise.driver_savings_ledger dsl
+                    JOIN webwise.trucker_profiles tp ON tp.mc_number = dsl.driver_mc_number
+                    WHERE tp.id = :tid AND dsl.load_id = :load_id AND dsl.status = 'CREDITED'
+                """),
+                {"tid": trucker_id, "load_id": load_id},
+            ).first()
+        if not existing:
+            result = process_load_settlement(engine, trucker_id, load_id, final_rate)
+            credits = result.get("credits_issued", 0) or 0
+            if credits > 0:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text("INSERT INTO webwise.notifications (trucker_id, message, notif_type, is_read) VALUES (:tid, :msg, 'BOL_REFILL', false)"),
+                            {"tid": trucker_id, "msg": f"📄 BOL uploaded! {credits:.1f} $CANDLE added to your tank."},
+                        )
+                except Exception:
+                    pass
+
+    resp = templates.TemplateResponse(
+        "drivers/partials/upload_document_success.html",
+        {"request": request, "file_url": file_url, "load_id": load_id, "doc_type": doc_type},
+    )
+    resp.headers["HX-Trigger"] = "bolUploaded, dashboardActiveLoadsRefresh"
+    return resp
+
+
+@router.post("/drivers/loads/{load_id}/send-to-factoring", response_class=HTMLResponse)
+def driver_send_to_factoring(
+    load_id: str,
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+):
+    """
+    Send the Factoring Packet (BOL + RateCon) to the driver's factoring company.
+    Requires BOL to be uploaded. Swaps button for success badge on success.
+    """
+    if not user or user.get("role") != "client":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not available")
+
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            raise HTTPException(status_code=403, detail="Trucker profile not found")
+        trucker_id = row[0]
+
+    result = send_packet_to_factor(engine, load_id, trucker_id, user.get("id"))
+
+    if not result.get("ok"):
+        return HTMLResponse(
+            content=f'<div class="p-3 bg-amber-900/50 border border-amber-500/50 rounded-lg text-amber-200 text-sm">{result.get("message", "Failed")}</div>',
+            status_code=400,
+        )
+
+    return templates.TemplateResponse(
+        "drivers/partials/factoring_sent_success.html",
+        {
+            "request": request,
+            "load_id": load_id,
+            "message": result.get("message", "Packet sent to factoring."),
+            "final_rate": result.get("final_rate", 0),
+            "candle_reward": result.get("candle_reward", 0),
+        },
+    )
 
 
 @router.post("/drivers/load/{load_id}/toggle-autopilot", response_class=HTMLResponse)

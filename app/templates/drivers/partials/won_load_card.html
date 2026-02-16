@@ -21,6 +21,28 @@
             {% endif %}
         </div>
     </div>
+    <div id="upload-result-{{ load.load_id }}" class="mt-3"></div>
+    <form hx-post="/drivers/loads/{{ load.load_id }}/upload-document"
+          hx-target="#upload-result-{{ load.load_id }}"
+          hx-swap="innerHTML"
+          hx-encoding="multipart/form-data"
+          hx-indicator="#upload-spinner-{{ load.load_id }}"
+          class="mt-3">
+        <input type="hidden" name="doc_type" value="BOL" />
+        <div class="flex gap-2 items-center">
+            <label class="cursor-pointer inline-flex items-center gap-1.5 bg-green-700/80 hover:bg-green-600 text-white text-xs font-bold px-3 py-2 rounded-lg transition flex-1 justify-center">
+                <i class="fas fa-file-upload"></i>
+                <span>Upload BOL</span>
+                <input type="file" name="file" accept="image/*,.pdf" class="hidden" required />
+            </label>
+            <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-bold px-3 py-2 rounded-lg transition">
+                <i class="fas fa-paper-plane"></i> Send
+            </button>
+        </div>
+        <div id="upload-spinner-{{ load.load_id }}" class="htmx-indicator text-slate-500 text-[10px] mt-1">
+            <i class="fas fa-spinner fa-spin mr-1"></i> Processing...
+        </div>
+    </form>
     <a href="/drivers/terminal/{{ load.load_id }}" 
        class="block w-full mt-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold py-2 rounded-lg text-center transition flex items-center justify-center gap-2">
         <i class="fas fa-terminal"></i>

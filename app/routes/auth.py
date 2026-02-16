@@ -67,7 +67,7 @@ def auth_client(request: Request, email: str = Form(...), password: str = Form(.
         )
 
     session_token = sign_session({"uid": user["id"], "role": user["role"], "email": user["email"]})
-    response = RedirectResponse(url="/drivers/dashboard2", status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse(url="/drivers/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         SESSION_COOKIE, session_token, httponly=True, secure=False, samesite="lax", max_age=SESSION_TTL_SECONDS
     )
@@ -237,7 +237,7 @@ def register_trucker(
         print(f"⚠️  Welcome email failed (non-blocking): {e}")
     
     session_token = sign_session({"uid": user_id, "role": "client", "email": email.strip().lower()})
-    response = RedirectResponse(url="/drivers/dashboard2", status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse(url="/drivers/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         SESSION_COOKIE, session_token, httponly=True, secure=False, samesite="lax", max_age=SESSION_TTL_SECONDS
     )
