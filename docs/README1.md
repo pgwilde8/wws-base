@@ -1,9 +1,12 @@
 134.199.241.56:8990
+greencandledispatch.com (→ proxy to 8990)
 134.199.241.56:8990/savings-view
 134.199.241.56:8990/savings-test
 134.199.241.56:8990/drivers/dashboard
 134.199.241.56:8990/savings-view 
+
 /srv/projects/client/dispatch/app/templates/drivers/dashboard.html
+
 cd /srv/projects/client/dispatch
 source .venv/bin/activate
 
@@ -13,12 +16,21 @@ uvicorn app.main:app --host 0.0.0.0 --port 8990 --reload --log-level debug --acc
 tree /srv/projects/client/dispatch
 tree /srv/projects/client/dispatch/app/api/v1/__pycache__
 tree /srv/projects/client/dispatch/app/templates/drivers
+tree /srv/projects/client/dispatch/app/green-candle-extension
+
+---
+## Domain: greencandledispatch.com
+Nginx config: /etc/nginx/sites-available/greencandledispatch.com (proxies to 127.0.0.1:8990)
+1. DNS: Add A record for greencandledispatch.com and www → 134.199.241.56
+2. HTTPS: sudo certbot --nginx -d greencandledispatch.com -d www.greencandledispatch.com
+3. Reload nginx: sudo systemctl reload nginx
+---
 
 # Do NOT commit real tokens. Use a placeholder or keep in .env / local notes only.
 # git remote set-url origin https://YOUR_TOKEN@github.com/pgwilde8/dispatch.git
 
 git add -A
-git commit -m "onboard"
+git commit -m "onboard2"
 git push -u origin main
 
 http://134.199.241.56:8990/admin/login

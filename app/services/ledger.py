@@ -120,29 +120,43 @@ def issue_service_credits(engine, trucker_id: int, load_id: str, total_paid: flo
     return issue_load_credits(engine, trucker_id, load_id, total_paid)
 
 
-# --- USAGE MENU: $CANDLE cost per action (Revenue Model Page 12-13) ---
+# --- Automation Fuel: $CANDLE cost per action (1 $CANDLE = $1 service value) ---
 USAGE_RATES = {
-    "AUTO_BOOKING": 3.0,      # Rate Confirmation detected (idempotent per load)
-    "MANUAL_EMAIL": 0.1,      # Driver sends Counter / Counter-to-Market
-    "VOICE_ESCALATION": 0.5,  # Driver escalates to AI phone call
-    "DOC_PARSE": 1.0,         # AI parses BOL/Invoice
+    "NEGOTIATION_AGENT": 0.5,   # Per negotiation attempt
+    "FACTORING_PACKET": 0.3,    # Per packet send to factoring
+    "FULL_DISPATCH": 10.0,      # On successful booking (range 10–25, using 10 as default)
+    "AUTO_BOOKING": 10.0,       # Alias for FULL_DISPATCH (Rate Confirmation detected)
+    "MANUAL_EMAIL": 0.5,        # Driver sends Counter / negotiation (was 0.1)
+    "VOICE_ESCALATION": 0.5,    # Driver escalates to AI phone call
+    "DOC_PARSE": 1.0,           # AI parses BOL/Invoice
 }
 AUTOPILOT_COST = USAGE_RATES["AUTO_BOOKING"]
+NEGOTIATION_AGENT_COST = USAGE_RATES["NEGOTIATION_AGENT"]
+FACTORING_PACKET_COST = USAGE_RATES["FACTORING_PACKET"]
 OUTBOUND_EMAIL_COST = USAGE_RATES["MANUAL_EMAIL"]
 AI_VOICE_CALL_COST = USAGE_RATES["VOICE_ESCALATION"]
 
 
+def has_sufficient_fuel(engine, trucker_id: int, cost: float) -> bool:
+    """Check if driver has enough $CANDLE for an action."""
+    if not engine or not trucker_id or cost <= 0:
+        return False
+    from app.services.vesting import VestingService
+    balance = VestingService.get_claimable_balance(engine, trucker_id)
+    return balance >= cost
+
+
 def record_usage(engine, trucker_id: int, load_id: str, action_key: str) -> bool:
     """
-    Deducts service credits for a specific action. Single entry point for the Usage Menu.
-    AUTO_BOOKING: delegates to deduct_success_fee (idempotent).
-    Others: insert CONSUMED row (each action charged).
-    Returns True if charged, False if skipped/failed.
+    Deducts Automation Fuel for an action. Returns True if charged, False if insufficient or failed.
+    Checks balance before deducting.
     """
     if not engine or not trucker_id or not load_id or not action_key:
         return False
     cost = USAGE_RATES.get(action_key)
     if cost is None or cost <= 0:
+        return False
+    if not has_sufficient_fuel(engine, trucker_id, cost):
         return False
 
     if action_key == "AUTO_BOOKING":

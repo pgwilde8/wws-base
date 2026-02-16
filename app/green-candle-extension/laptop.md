@@ -1,3 +1,33 @@
+// C:\Users\xyzag\OneDrive\Desktop\green-candle-scout\background.js
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "UPLOAD_DATA") {
+        // 1. Grab the key that popup.js saved
+        chrome.storage.local.get(['scout_api_key'], function(result) {
+            const apiKey = result.scout_api_key;
+
+            // 2. Fire the request to your VM
+            fetch("http://134.199.241.56:8990/api/ingest/loads", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-API-Key": apiKey // THIS IS THE CRITICAL LINE
+                },
+                body: JSON.stringify(request.loads)
+            })
+            .then(response => {
+                console.log("Ingest Status:", response.status);
+                sendResponse({ status: "success", code: response.status });
+            })
+            .catch(err => {
+                console.error("Upload Error:", err);
+                sendResponse({ status: "error" });
+            });
+        });
+        return true; // Keeps the communication line open for the async fetch
+    }
+});
+================
 // content.js - The Field Agent (Master Version)
 alert("GC Scout is Awake!");
 console.log("🕯️ Green Candle Scout Loaded");
@@ -173,3 +203,107 @@ function scrapeGeneric() {
     });
     return loads;
 }
+=================
+{
+  "manifest_version": 3,
+  "name": "Green Candle Scout",
+  "version": "1.0",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://134.199.241.56:8990/*",
+    "https://*.dat.com/*",
+    "https://*.truckstop.com/*",
+    "https://app.trucksmarter.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://134.199.241.56:8990/*",
+        "https://*.dat.com/*",
+        "https://*.truckstop.com/*",
+        "https://app.trucksmarter.com/*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
+}
+====
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { width: 300px; padding: 15px; font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; }
+        .header { color: #10b981; font-weight: 800; font-style: italic; margin-bottom: 10px; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fbbf24; font-family: monospace; font-size: 11px; }
+        button { width: 100%; padding: 12px; background: #10b981; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 6px; margin-top: 5px; }
+        button:hover { background: #059669; }
+        .status { font-size: 12px; color: #94a3b8; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">GREEN CANDLE SCOUT</div>
+    <div class="status" id="status">Status: Not Connected</div>
+    <input type="text" id="apiKey" placeholder="Paste Scout API Key here">
+    <button id="saveBtn">SAVE API KEY</button>
+    <hr style="border: 0.5px solid #334155; margin: 15px 0;">
+    <button id="scrapeBtn" style="background: #3b82f6;">SCRAPE TRUCKSMARTER</button>
+    <script src="popup.js"></script>
+</body>
+</html>
+
+=================
+document.addEventListener('DOMContentLoaded', function() {
+    const apiKeyInput = document.getElementById('apiKey');
+    const saveBtn = document.getElementById('saveBtn');
+    const scrapeBtn = document.getElementById('scrapeBtn');
+    const statusDiv = document.getElementById('status');
+
+    // Load existing key
+    chrome.storage.local.get(['scout_api_key'], function(result) {
+        if (result.scout_api_key) {
+            apiKeyInput.value = result.scout_api_key;
+            statusDiv.innerText = "Status: Key Saved ✓";
+            statusDiv.style.color = "#10b981";
+        }
+    });
+
+    // Save key logic
+    saveBtn.addEventListener('click', function() {
+        const key = apiKeyInput.value.trim();
+        if (key) {
+            chrome.storage.local.set({ 'scout_api_key': key }, function() {
+                statusDiv.innerText = "Status: Key Saved ✓";
+                alert("API Key Saved!");
+            });
+        }
+    });
+
+    // THE FIX: The Scrape Button logic
+    scrapeBtn.addEventListener('click', async () => {
+        statusDiv.innerText = "Scouting loads...";
+        
+        // 1. Get the current active tab (TruckSmarter)
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+        // 2. Tell content.js to run the scrape function
+        chrome.tabs.sendMessage(tab.id, { action: "SCRAPE_NOW" }, (response) => {
+            if (chrome.runtime.lastError) {
+                statusDiv.innerText = "Error: Refresh the page";
+                statusDiv.style.color = "#ef4444";
+            } else {
+                statusDiv.innerText = "Success: " + response.count + " loads sent!";
+                statusDiv.style.color = "#10b981";
+            }
+        });
+    });
+});

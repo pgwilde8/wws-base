@@ -61,7 +61,7 @@
 
     <!-- Automation Fuel Tank (Service Credits) -->
     {% set balance = savings_data.claimable_balance if savings_data else 0 %}
-    {% set autopilot_runs = (balance / 3) | int %}
+    {% set autopilot_runs = (balance / 10) | int %}
     <div class="px-4 mb-6">
         <div class="bg-slate-900 rounded-3xl p-6 border border-slate-800 shadow-2xl relative overflow-hidden">
             <div class="absolute -right-10 -top-10 bg-blue-500/10 w-40 h-40 rounded-full blur-3xl"></div>
@@ -71,7 +71,7 @@
                     <div>
                         <h3 class="text-slate-500 text-[10px] uppercase font-black tracking-[0.2em] mb-1">Automation Fuel Tank</h3>
                         <div class="text-3xl font-black text-white">{{ "{:,.1f}".format(balance) }} $CANDLE</div>
-                        <div class="text-[10px] text-blue-400 mt-1 font-bold">That's enough for {{ autopilot_runs }} Autonomous Booking{{ 's' if autopilot_runs != 1 else '' }}</div>
+                        <div class="text-[10px] text-blue-400 mt-1 font-bold">That's enough for {{ autopilot_runs }} Full Dispatch{{ 'es' if autopilot_runs != 1 else '' }} (10 $CANDLE each)</div>
                     </div>
                     <span class="bg-blue-500/20 text-blue-400 text-[10px] font-black px-3 py-1 rounded-full border border-blue-500/30">
                         <i class="fas fa-bolt mr-1"></i>IMMEDIATE USE
@@ -287,7 +287,7 @@
                     <div class="flex-1">
                         <div class="h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
                             <div class="h-full bg-indigo-500 shadow-[0_0_10px_#6366f1] transition-all duration-300" 
-                                 style="width: {{ card_eligibility.vesting_progress_pct }}%;"></div>
+                                 style="width: {{ 100 if card_eligibility.eligible else 0 }}%;"></div>
                         </div>
                         <div class="flex justify-between mt-2">
                             <span class="text-[9px] text-slate-500 uppercase font-bold">Card Eligibility</span>
@@ -295,7 +295,7 @@
                                 {% if card_eligibility.eligible %}
                                     Ready to Request!
                                 {% else %}
-                                    {{ card_eligibility.days_until_eligible }} Days to Card Request
+                                    Earn $CANDLE to request a card
                                 {% endif %}
                             </span>
                         </div>

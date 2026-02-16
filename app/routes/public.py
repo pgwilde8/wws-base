@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Request, Form, Body, HTTPException, BackgroundTasks
+from fastapi.responses import RedirectResponse
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from fastapi.responses import HTMLResponse, JSONResponse
 from app.services.load_board import LoadBoardService
-from app.services.email import parse_broker_reply
+from app.services.email import parse_broker_reply, send_contact_form_email
 from app.services.buyback_notifications import BuybackNotificationService
 
 from app.core.deps import templates, engine, run_assistant_message
@@ -78,6 +79,37 @@ def protocol_page(request: Request):
 @router.get("/contact")
 def contact_page(request: Request):
     return templates.TemplateResponse("public/contact.html", {"request": request})
+
+
+@router.post("/contact")
+def contact_form_submit(
+    request: Request,
+    name: str = Form(""),
+    email: str = Form(""),
+    message: str = Form(""),
+):
+    """
+    Receive contact form data and email it to CONTACT_RECIPIENT_EMAIL (contact@gcdloads.com).
+    """
+    if not email or "@" not in email:
+        return templates.TemplateResponse(
+            "public/contact.html",
+            {"request": request, "error": "Please enter a valid email address."},
+        )
+    result = send_contact_form_email(
+        name=(name or "").strip(),
+        user_email=email.strip(),
+        message=(message or "").strip(),
+    )
+    if result.get("status") == "success":
+        return templates.TemplateResponse(
+            "public/contact.html",
+            {"request": request, "success": "Thanks! We'll get back to you within one business day."},
+        )
+    return templates.TemplateResponse(
+        "public/contact.html",
+        {"request": request, "error": result.get("message", "Failed to send. Please try emailing us directly.")},
+    )
 
 
 @router.get("/privacy-policy")

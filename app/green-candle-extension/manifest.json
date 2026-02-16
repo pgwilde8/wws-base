@@ -2,17 +2,16 @@
   "manifest_version": 3,
   "name": "Green Candle Scout",
   "version": "1.0",
-  "description": "Scrapes load board data for the Green Candle Network.",
   "permissions": [
     "activeTab",
     "scripting",
     "storage"
   ],
   "host_permissions": [
-    "http://localhost:8990/*",
-    "http://localhost:8000/*",
+    "http://134.199.241.56:8990/*",
     "https://*.dat.com/*",
-    "https://*.truckstop.com/*"
+    "https://*.truckstop.com/*",
+    "https://app.trucksmarter.com/*"
   ],
   "action": {
     "default_popup": "popup.html"
@@ -22,7 +21,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "http://134.199.241.56:8990/*",
+        "https://*.dat.com/*",
+        "https://*.truckstop.com/*",
+        "https://app.trucksmarter.com/*"
+      ],
       "js": ["content.js"]
     }
   ]

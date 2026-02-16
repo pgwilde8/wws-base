@@ -2,113 +2,21 @@
 <html>
 <head>
     <style>
-        body {
-            width: 300px;
-            background: #0f172a;
-            color: white;
-            font-family: sans-serif;
-            padding: 15px;
-            margin: 0;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        .header h3 {
-            margin: 0;
-            color: #22c55e;
-            font-size: 16px;
-        }
-        .status-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 6px;
-        }
-        .status-indicator.connected {
-            background: #22c55e;
-            box-shadow: 0 0 8px #22c55e;
-        }
-        .status-indicator.disconnected {
-            background: #64748b;
-        }
-        .api-key-section {
-            margin-bottom: 15px;
-        }
-        .api-key-section label {
-            display: block;
-            font-size: 10px;
-            color: #94a3b8;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            font-weight: bold;
-        }
-        .api-key-section input {
-            width: 100%;
-            background: #1e293b;
-            border: 1px solid #334155;
-            color: white;
-            padding: 8px;
-            border-radius: 5px;
-            font-size: 11px;
-            font-family: monospace;
-            box-sizing: border-box;
-        }
-        .api-key-section input:focus {
-            outline: none;
-            border-color: #22c55e;
-        }
-        button {
-            width: 100%;
-            background: #22c55e;
-            color: #0f172a;
-            border: none;
-            padding: 10px;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 5px;
-            margin-bottom: 10px;
-        }
-        button:hover {
-            background: #4ade80;
-        }
-        button:disabled {
-            background: #475569;
-            cursor: not-allowed;
-        }
-        #status {
-            font-size: 11px;
-            margin-top: 10px;
-            text-align: center;
-            color: #94a3b8;
-            min-height: 30px;
-        }
-        .status-success {
-            color: #22c55e;
-        }
-        .status-error {
-            color: #ef4444;
-        }
+        body { width: 300px; padding: 15px; font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; }
+        .header { color: #10b981; font-weight: 800; font-style: italic; margin-bottom: 10px; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: #fbbf24; font-family: monospace; font-size: 11px; }
+        button { width: 100%; padding: 12px; background: #10b981; border: none; color: white; font-weight: bold; cursor: pointer; border-radius: 6px; margin-top: 5px; }
+        button:hover { background: #059669; }
+        .status { font-size: 12px; color: #94a3b8; margin-bottom: 5px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h3>🕯️ Green Candle Scout</h3>
-        <div id="connectionStatus" style="font-size: 10px; color: #64748b;">
-            <span class="status-indicator disconnected"></span>Checking...
-        </div>
-    </div>
-    
-    <div class="api-key-section">
-        <label>API Key</label>
-        <input type="text" id="apiKeyInput" placeholder="Paste your API key here">
-    </div>
-    
+    <div class="header">GREEN CANDLE SCOUT</div>
+    <div class="status" id="status">Status: Not Connected</div>
+    <input type="text" id="apiKey" placeholder="Paste Scout API Key here">
     <button id="saveBtn">SAVE API KEY</button>
-    <button id="scrapeBtn" disabled>SCRAPE PAGE</button>
-    
-    <div id="status">Configure API key to start</div>
+    <hr style="border: 0.5px solid #334155; margin: 15px 0;">
+    <button id="scrapeBtn" style="background: #3b82f6;">SCRAPE TRUCKSMARTER</button>
     <script src="popup.js"></script>
 </body>
 </html>

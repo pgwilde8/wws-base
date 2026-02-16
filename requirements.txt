@@ -11,3 +11,4 @@ python-multipart
 boto3
 Pillow
 img2pdf
+stripe

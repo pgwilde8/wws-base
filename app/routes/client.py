@@ -783,7 +783,6 @@ def onboarding_claim_mc(
         ).first()
         if not row or not (row.display_name or "").strip():
             raise HTTPException(status_code=400, detail="Complete Step 1 first")
-        trucker_id = row[0]
         display_name = (row.display_name or "").strip().lower()
         conn.execute(
             text("""
@@ -793,16 +792,79 @@ def onboarding_claim_mc(
             """),
             {"mc": mc_clean if auth_type == "MC" else None, "dot": dot_clean if auth_type == "DOT" else None, "auth": auth_type, "uid": user.get("id")},
         )
-    from app.services.onboarding import onboard_new_driver
-    mc_for_ledger = mc_clean if auth_type == "MC" else dot_clean
-    dot_for_ledger = dot_clean if auth_type == "MC" else ""
-    onboard_new_driver(engine, user.get("id"), mc_for_ledger, dot_for_ledger, display_name, "SOLO")
-    from app.services.vesting import VestingService
-    balance = VestingService.get_claimable_balance(engine, trucker_id)
+    # Do NOT call onboard_new_driver here; payment step (step 2b) comes first
     return templates.TemplateResponse(
-        "drivers/partials/onboarding_step3.html",
-        {"request": request, "balance": balance, "display_name": display_name, "email_domain": os.getenv("EMAIL_DOMAIN", "gcdloads.com")},
+        "drivers/partials/onboarding_step2b_payment.html",
+        {"request": request, "email_domain": os.getenv("EMAIL_DOMAIN", "gcdloads.com")},
     )
+
+
+@router.post("/drivers/onboarding/create-setup-checkout")
+def create_setup_checkout(
+    body: dict = Body(default_factory=dict),
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Create Stripe Checkout Session for Small Fleet Setup ($25/truck, 1–5 trucks). Returns {url} or {error}."""
+    from fastapi.responses import JSONResponse
+    if not user or user.get("role") != "client":
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+    truck_count = int((body or {}).get("truck_count", 1) or 1)
+    truck_count = max(1, min(5, truck_count))
+    base_url = os.getenv("BASE_URL", "https://greencandledispatch.com").rstrip("/")
+    success_url = f"{base_url}/drivers/onboarding/checkout-success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{base_url}/drivers/onboarding/welcome"
+    from app.services.stripe_checkout import create_setup_checkout_session
+    url = create_setup_checkout_session(
+        user_id=user["id"],
+        truck_count=truck_count,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        customer_email=user.get("email"),
+    )
+    if url:
+        return JSONResponse(content={"url": url})
+    return JSONResponse(status_code=503, content={"error": "Stripe is not configured. Set STRIPE_SECRET_KEY."})
+
+
+@router.get("/drivers/onboarding/checkout-success", response_class=HTMLResponse)
+def checkout_success(
+    request: Request,
+    session_id: str = "",
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Verify Stripe payment and complete onboarding. Redirects to dashboard."""
+    if not user or user.get("role") != "client" or not engine:
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not session_id:
+        return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+    from app.services.stripe_checkout import retrieve_and_verify_session
+    meta = retrieve_and_verify_session(session_id)
+    if not meta or int(meta["user_id"]) != user.get("id"):
+        return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+    truck_count = meta["truck_count"]
+    tier = "FLEET" if truck_count >= 2 else "SOLO"
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id, display_name, mc_number, dot_number FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row or not (row.display_name or "").strip():
+            return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+        mc_for_ledger = (row.mc_number or row.dot_number or "").strip()
+        dot_for_ledger = (row.dot_number or "").strip()
+        display_name = (row.display_name or "").strip().lower()
+        if not mc_for_ledger:
+            return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+    from app.services.onboarding import onboard_new_driver
+    onboard_new_driver(
+        engine,
+        user.get("id"),
+        mc_for_ledger,
+        dot_for_ledger,
+        display_name,
+        tier,
+    )
+    return RedirectResponse(url="/drivers/dashboard", status_code=303)
 
 
 @router.get("/drivers/dashboard-mission", response_class=HTMLResponse)
@@ -847,6 +909,23 @@ def dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_u
             "drivers/partials/onboarding_step2.html",
             {"request": request, "email_domain": email_domain, "display_name": (row.display_name or "").strip()},
         )
+    # Has handle + MC but not yet paid for setup -> show payment step (1–5 trucks)
+    mc_for_ledger = (row.mc_number or row.dot_number or "").strip() if row else ""
+    if mc_for_ledger:
+        with engine.begin() as conn:
+            paid = conn.execute(
+                text("""
+                    SELECT 1 FROM webwise.driver_savings_ledger
+                    WHERE driver_mc_number = :mc AND load_id IN ('STARTER_PACK', 'FLEET_STARTER_PACK')
+                    LIMIT 1
+                """),
+                {"mc": mc_for_ledger},
+            ).first()
+        if not paid:
+            return templates.TemplateResponse(
+                "drivers/partials/onboarding_step2b_payment.html",
+                {"request": request, "email_domain": email_domain},
+            )
     from app.services.vesting import VestingService
     balance = VestingService.get_claimable_balance(engine, row.id) if row else 0.0
     is_first_login = bool(row and getattr(row, "is_first_login", False))
@@ -1780,7 +1859,7 @@ def driver_send_to_factoring(
 ):
     """
     Send the Factoring Packet (BOL + RateCon) to the driver's factoring company.
-    Requires BOL to be uploaded. Swaps button for success badge on success.
+    Requires BOL to be uploaded. Deducts 0.3 $CANDLE (FACTORING_PACKET cost).
     """
     if not user or user.get("role") != "client":
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -1796,6 +1875,13 @@ def driver_send_to_factoring(
             raise HTTPException(status_code=403, detail="Trucker profile not found")
         trucker_id = row[0]
 
+    from app.services.ledger import record_usage, FACTORING_PACKET_COST, has_sufficient_fuel
+    if not has_sufficient_fuel(engine, trucker_id, FACTORING_PACKET_COST):
+        return HTMLResponse(
+            content=f'<div class="p-3 bg-red-900/50 border border-red-500/50 rounded-lg text-red-200 text-sm">Insufficient Automation Fuel. Need {FACTORING_PACKET_COST} $CANDLE. <a href="/drivers/buy-fuel" class="underline">Add Fuel</a></div>',
+            status_code=402,
+        )
+
     result = send_packet_to_factor(engine, load_id, trucker_id, user.get("id"))
 
     if not result.get("ok"):
@@ -1803,6 +1889,8 @@ def driver_send_to_factoring(
             content=f'<div class="p-3 bg-amber-900/50 border border-amber-500/50 rounded-lg text-amber-200 text-sm">{result.get("message", "Failed")}</div>',
             status_code=400,
         )
+
+    record_usage(engine, trucker_id, load_id, "FACTORING_PACKET")
 
     return templates.TemplateResponse(
         "drivers/partials/factoring_sent_success.html",
@@ -2173,24 +2261,20 @@ async def confirm_negotiation(negotiation_id: int, request: Request, user: Optio
                     
                     finders_fee_usd = RewardTierService.calculate_finders_fee(final_rate)
                     
-                    # Credit Finder's Fee to discoverer's savings ledger
-                    from datetime import datetime, timedelta
+                    # Credit Finder's Fee to discoverer's Automation Fuel (immediate)
                     current_price = TokenPriceService.get_candle_price()
                     tokens_earned = finders_fee_usd / current_price if current_price > 0 else 0.0
-                    unlock_date = datetime.now() + timedelta(days=180)
-                    
                     conn.execute(
                         text("""
                             INSERT INTO webwise.driver_savings_ledger 
                             (driver_mc_number, load_id, amount_usd, amount_candle, unlocks_at, status)
-                            VALUES (:mc, :load, :usd, :tokens, :unlock, 'LOCKED')
+                            VALUES (:mc, :load, :usd, :tokens, now(), 'CREDITED')
                         """),
                         {
                             "mc": discoverer_row.mc_number,
                             "load": f"FINDERS_FEE-{load_id}",
                             "usd": finders_fee_usd,
                             "tokens": tokens_earned,
-                            "unlock": unlock_date
                         }
                     )
                     
@@ -2462,44 +2546,16 @@ def get_driver_savings(mc_number: str, db: Session = Depends(get_db)):
     total_result = db.execute(total_query, {"mc": mc_number}).first()
     total_balance = float(total_result.total) if total_result else 0.0
 
-    # 2. Get the 'Next Unlock' date (The carrot on the stick)
-    next_unlock_query = text("""
-        SELECT unlocks_at
-        FROM webwise.driver_savings_ledger
-        WHERE driver_mc_number = :mc
-          AND status = 'LOCKED'
-        ORDER BY unlocks_at ASC
-        LIMIT 1
-    """)
-    next_unlock_result = db.execute(next_unlock_query, {"mc": mc_number}).first()
-    next_vesting_date = next_unlock_result.unlocks_at if next_unlock_result else None
+    # 2. Get available balance (Automation Fuel model - no lock)
+    from app.services.vesting import VestingService
+    trucker_row = db.execute(
+        text("SELECT id FROM webwise.trucker_profiles WHERE mc_number = :mc"),
+        {"mc": mc_number}
+    ).first()
+    trucker_id = trucker_row[0] if trucker_row else None
+    claimable_balance = VestingService.get_claimable_balance(engine, trucker_id) if trucker_id and engine else total_balance
 
-    # 3. Calculate days until next unlock (for the countdown)
-    days_until_unlock = None
-    if next_vesting_date:
-        delta = next_vesting_date - datetime.now(next_vesting_date.tzinfo)
-        days_until_unlock = max(0, delta.days) if delta.total_seconds() > 0 else 0
-
-    # 4. Get locked vs unlocked breakdown
-    locked_query = text("""
-        SELECT COALESCE(SUM(amount_candle), 0) as locked_total
-        FROM webwise.driver_savings_ledger
-        WHERE driver_mc_number = :mc
-          AND status = 'LOCKED'
-    """)
-    locked_result = db.execute(locked_query, {"mc": mc_number}).first()
-    locked_balance = float(locked_result.locked_total) if locked_result else 0.0
-
-    unlocked_query = text("""
-        SELECT COALESCE(SUM(amount_candle), 0) as unlocked_total
-        FROM webwise.driver_savings_ledger
-        WHERE driver_mc_number = :mc
-          AND status IN ('VESTED', 'CLAIMED')
-    """)
-    unlocked_result = db.execute(unlocked_query, {"mc": mc_number}).first()
-    unlocked_balance = float(unlocked_result.unlocked_total) if unlocked_result else 0.0
-
-    # 5. Get the Transaction History (The proof)
+    # 3. Get the Transaction History (The proof)
     history_query = text("""
         SELECT 
             id,
@@ -2533,10 +2589,7 @@ def get_driver_savings(mc_number: str, db: Session = Depends(get_db)):
     return {
         "mc_number": mc_number,
         "total_candle_balance": total_balance,
-        "locked_balance": locked_balance,
-        "unlocked_balance": unlocked_balance,
-        "next_vesting_date": next_vesting_date.isoformat() if next_vesting_date else None,
-        "days_until_unlock": days_until_unlock,
+        "claimable_balance": claimable_balance,
         "recent_transactions": recent_transactions,
         "transaction_count": len(recent_transactions)
     }    
@@ -2646,51 +2699,14 @@ def view_savings_page(request: Request, user: Optional[Dict] = Depends(current_u
         )
     
     with engine.begin() as conn:
-        # Get total balance
+        # Get total credits (positive entries only, for display)
         total_query = text("""
-            SELECT COALESCE(SUM(amount_candle), 0) as total
+            SELECT COALESCE(SUM(CASE WHEN amount_candle > 0 THEN amount_candle ELSE 0 END), 0) as total
             FROM webwise.driver_savings_ledger
             WHERE driver_mc_number = :mc
         """)
         total_result = conn.execute(total_query, {"mc": mc_number}).first()
         total_balance = float(total_result.total) if total_result else 0.0
-
-        # Get next unlock date
-        next_unlock_query = text("""
-            SELECT unlocks_at
-            FROM webwise.driver_savings_ledger
-            WHERE driver_mc_number = :mc
-              AND status = 'LOCKED'
-            ORDER BY unlocks_at ASC
-            LIMIT 1
-        """)
-        next_unlock_result = conn.execute(next_unlock_query, {"mc": mc_number}).first()
-        next_vesting_date = next_unlock_result.unlocks_at if next_unlock_result else None
-
-        # Calculate days until unlock
-        days_until_unlock = None
-        if next_vesting_date:
-            delta = next_vesting_date - datetime.now(next_vesting_date.tzinfo)
-            days_until_unlock = max(0, delta.days) if delta.total_seconds() > 0 else 0
-
-        # Get locked vs unlocked breakdown
-        locked_query = text("""
-            SELECT COALESCE(SUM(amount_candle), 0) as locked_total
-            FROM webwise.driver_savings_ledger
-            WHERE driver_mc_number = :mc
-              AND status = 'LOCKED'
-        """)
-        locked_result = conn.execute(locked_query, {"mc": mc_number}).first()
-        locked_balance = float(locked_result.locked_total) if locked_result else 0.0
-
-        unlocked_query = text("""
-            SELECT COALESCE(SUM(amount_candle), 0) as unlocked_total
-            FROM webwise.driver_savings_ledger
-            WHERE driver_mc_number = :mc
-              AND status IN ('VESTED', 'CLAIMED')
-        """)
-        unlocked_result = conn.execute(unlocked_query, {"mc": mc_number}).first()
-        unlocked_balance = float(unlocked_result.unlocked_total) if unlocked_result else 0.0
 
         # Get recent transactions
         history_query = text("""
@@ -2767,15 +2783,11 @@ def view_savings_page(request: Request, user: Optional[Dict] = Depends(current_u
         savings_data = {
             "mc_number": mc_number,
             "total_candle_balance": total_balance,
-            "locked_balance": locked_balance,
-            "unlocked_balance": unlocked_balance,
             "claimable_balance": claimable_balance,
             "consumed_balance": vesting_stats.get("consumed_balance", 0),
-            "next_vesting_date": next_vesting_date.isoformat() if next_vesting_date else None,
-            "days_until_unlock": days_until_unlock,
             "recent_transactions": recent_transactions,
             "transaction_count": len(recent_transactions),
-            "minutes_remaining": 0,  # TODO: Call Packs (Twilio) - separate from $CANDLE
+            "minutes_remaining": 0,  # Call Packs (Twilio) - separate from $CANDLE
         }
     
     return templates.TemplateResponse(
@@ -2975,73 +2987,17 @@ async def submit_claim_request(request: Request, user: Optional[Dict] = Depends(
 
 @router.post("/drivers/claim/reinvest", response_class=HTMLResponse)
 async def reinvest_tokens(request: Request, user: Optional[Dict] = Depends(current_user)):
-    """Re-invest claimable tokens for +5% bonus (extends vesting by 3 months)."""
-    if not user or user.get("role") != "client" or not engine:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    
-    trucker_id = None
-    mc_number = None
-    claimable_balance = 0.0
-    
-    with engine.begin() as conn:
-        r = conn.execute(
-            text("SELECT id, mc_number FROM webwise.trucker_profiles WHERE user_id = :uid"),
-            {"uid": user.get("id")}
-        ).fetchone()
-        
-        if not r:
-            raise HTTPException(status_code=404, detail="Trucker profile not found")
-        
-        trucker_id = r.id
-        mc_number = r.mc_number
-        
-        # Get claimable balance
-        from app.services.vesting import VestingService
-        claimable_balance = VestingService.get_claimable_balance(engine, trucker_id)
-        
-        if claimable_balance <= 0:
-            raise HTTPException(status_code=400, detail="No tokens available to re-invest")
-        
-        # Calculate bonus (5% increase)
-        bonus_amount = claimable_balance * 0.05
-        total_reinvested = claimable_balance + bonus_amount
-        
-        # Extend vesting by 3 months for all vested entries
-        from datetime import timedelta
-        conn.execute(
-            text("""
-                UPDATE webwise.driver_savings_ledger
-                SET unlocks_at = unlocks_at + INTERVAL '3 months',
-                    amount_candle = amount_candle * 1.05,
-                    status = 'LOCKED',
-                    updated_at = now()
-                WHERE driver_mc_number = :mc
-                AND (status = 'VESTED' OR (status = 'LOCKED' AND unlocks_at <= now()))
-                AND status != 'CLAIMED'
-            """),
-            {"mc": mc_number}
-        )
-    
+    """No longer used—Automation Fuel model has no vesting. Kept for API compatibility."""
     if request.headers.get("HX-Request"):
         return HTMLResponse(
-            content=f'''
-            <div class="bg-gradient-to-r from-amber-900/40 to-yellow-900/40 border border-amber-500 rounded-xl p-6 text-center">
-                <div class="text-amber-400 text-4xl mb-3">💎</div>
-                <div class="text-white font-bold text-lg mb-2">Diamond Hands! Re-investment Complete</div>
-                <div class="text-slate-300 text-sm mb-4">
-                    Re-invested: {claimable_balance:,.2f} $CANDLE<br>
-                    Bonus Added: +{bonus_amount:,.2f} $CANDLE (+5%)<br>
-                    <span class="text-amber-400 font-bold">New Total: {total_reinvested:,.2f} $CANDLE</span>
-                </div>
-                <div class="text-[10px] text-slate-500">
-                    Tokens locked for additional 3 months. Your patience pays off!
-                </div>
+            content='''
+            <div class="bg-slate-800/80 border border-slate-600 rounded-xl p-6 text-center">
+                <div class="text-slate-400 text-sm">Re-invest is no longer needed. Your $CANDLE is always available as Automation Fuel.</div>
             </div>
             ''',
             headers={"HX-Trigger": "reinvestComplete"}
         )
-    
-    return RedirectResponse(url="/savings-view", status_code=303)
+    return RedirectResponse(url="/drivers/savings", status_code=303)
 
 
 @router.get("/drivers/leaderboard", response_class=HTMLResponse)
@@ -3089,11 +3045,11 @@ async def request_debit_card(request: Request, user: Optional[Dict] = Depends(cu
     
     if not eligibility["eligible"]:
         return HTMLResponse(
-            content=f'''
+            content='''
             <div class="bg-red-900/40 border border-red-500 rounded-xl p-4 text-center">
                 <div class="text-red-400 font-bold mb-2">Not Eligible Yet</div>
                 <div class="text-slate-300 text-sm">
-                    You need {eligibility["days_until_eligible"]} more days to request a card.
+                    You need Available Fuel ($CANDLE) to request a card. Complete loads to earn credits.
                 </div>
             </div>
             ''',
@@ -3574,24 +3530,6 @@ def savings_test_endpoint(mc_number: str = "MC_998877"):
         total_result = conn.execute(total_query, {"mc": mc_number}).first()
         total_balance = float(total_result.total) if total_result else 0.0
 
-        # Get next unlock date
-        next_unlock_query = text("""
-            SELECT unlocks_at
-            FROM webwise.driver_savings_ledger
-            WHERE driver_mc_number = :mc
-              AND status = 'LOCKED'
-            ORDER BY unlocks_at ASC
-            LIMIT 1
-        """)
-        next_unlock_result = conn.execute(next_unlock_query, {"mc": mc_number}).first()
-        next_vesting_date = next_unlock_result.unlocks_at if next_unlock_result else None
-
-        # Calculate days until unlock
-        days_until_unlock = None
-        if next_vesting_date:
-            delta = next_vesting_date - datetime.now(next_vesting_date.tzinfo)
-            days_until_unlock = max(0, delta.days) if delta.total_seconds() > 0 else 0
-
         # Get recent transactions
         history_query = text("""
             SELECT 
@@ -3623,8 +3561,6 @@ def savings_test_endpoint(mc_number: str = "MC_998877"):
     return {
         "mc_number": mc_number,
         "total_candle_balance": total_balance,
-        "next_vesting_date": next_vesting_date.isoformat() if next_vesting_date else None,
-        "days_until_unlock": days_until_unlock,
         "recent_transactions": recent_transactions,
         "note": "Test endpoint - use ?mc_number=MC_XXXXX to test different drivers"
     }

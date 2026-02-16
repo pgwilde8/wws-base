@@ -80,8 +80,9 @@
                           hx-target="#factoring-slot-{{ load.load_id }}"
                           hx-swap="innerHTML">
                         <button type="submit"
-                                class="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl transition shadow-lg shadow-green-500/20 flex items-center justify-center gap-2">
+                                class="relative w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 rounded-xl transition shadow-lg shadow-green-500/20 flex items-center justify-center gap-2">
                             <i class="fas fa-paper-plane"></i> SEND TO FACTORING
+                            <span class="absolute top-2 right-3 bg-slate-800/90 text-blue-400 text-[9px] font-bold px-2 py-0.5 rounded" title="Cost: 0.3 $CANDLE">0.3 $C</span>
                         </button>
                     </form>
                     {% else %}

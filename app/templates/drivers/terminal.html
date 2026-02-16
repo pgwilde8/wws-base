@@ -231,7 +231,7 @@
                     hx-swap="none"
                     class="relative bg-amber-600 hover:bg-amber-500 text-black font-bold py-3 rounded text-xs transition active:scale-95">
                 <span><i class="fas fa-plus mr-1"></i>Counter +$100</span>
-                <span class="absolute -top-1 -right-1 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded">0.1</span>
+                <span class="absolute -top-1 -right-1 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded" title="Cost: 0.5 $CANDLE">0.5</span>
             </button>
             <button hx-post="/drivers/negotiate/{{ load_id }}/ignore"
                     hx-swap="none"
@@ -244,7 +244,7 @@
                 hx-swap="none"
                 class="relative w-full bg-blue-900/40 hover:bg-blue-800/50 text-blue-400 font-bold py-3 rounded text-xs transition active:scale-95 flex items-center justify-center gap-2 border border-blue-500/30">
             <i class="fas fa-chart-line"></i> Market Counter (${{ "{:,.0f}".format(market_price) }})
-            <span class="absolute top-2 right-3 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded">0.1</span>
+            <span class="absolute top-2 right-3 bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded" title="Cost: 0.5 $CANDLE">0.5</span>
         </button>
     </div>
 

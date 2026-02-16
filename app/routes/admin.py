@@ -192,24 +192,20 @@ async def mark_negotiation_won(negotiation_id: int, body: dict = Body(...)):
                         
                         finders_fee_usd = RewardTierService.calculate_finders_fee(final_rate)
                         
-                        # Credit Finder's Fee to discoverer's savings ledger
-                        from datetime import datetime, timedelta
+                        # Credit Finder's Fee to discoverer's Automation Fuel (immediate)
                         current_price = TokenPriceService.get_candle_price()
                         tokens_earned = finders_fee_usd / current_price if current_price > 0 else 0.0
-                        unlock_date = datetime.now() + timedelta(days=180)
-                        
                         conn.execute(
                             text("""
                                 INSERT INTO webwise.driver_savings_ledger 
                                 (driver_mc_number, load_id, amount_usd, amount_candle, unlocks_at, status)
-                                VALUES (:mc, :load, :usd, :tokens, :unlock, 'LOCKED')
+                                VALUES (:mc, :load, :usd, :tokens, now(), 'CREDITED')
                             """),
                             {
                                 "mc": discoverer_row.mc_number,
                                 "load": f"FINDERS_FEE-{load_id}",
                                 "usd": finders_fee_usd,
                                 "tokens": tokens_earned,
-                                "unlock": unlock_date
                             }
                         )
                         

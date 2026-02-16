@@ -121,3 +121,46 @@ def parse_broker_reply(email_body: str, email_subject: str = "") -> Dict:
         status_hint = "lost"
 
     return {"status_hint": status_hint, "extracted_rate": extracted_rate}
+
+
+def send_contact_form_email(name: str, user_email: str, message: str) -> Dict:
+    """
+    Sends contact form submission to CONTACT_RECIPIENT_EMAIL.
+    Uses same SMTP as broker emails (MXROUTE_* or EMAIL_*). Reply-To = submitter's email.
+    """
+    to_email = os.getenv("CONTACT_RECIPIENT_EMAIL", "contact@gcdloads.com")
+    user = MX_USER or os.getenv("EMAIL_USER")
+    password = MX_PASS or os.getenv("EMAIL_PASS")
+    host = MX_HOST or os.getenv("EMAIL_HOST", "fusion.mxrouting.net")
+    port = MX_PORT or int(os.getenv("EMAIL_PORT", "465"))
+    if not user or not password:
+        return {"status": "error", "message": "SMTP credentials missing in .env"}
+
+    try:
+        from_email = os.getenv("CONTACT_FROM_EMAIL", f"contact@{EMAIL_DOMAIN}")
+        msg = MIMEMultipart()
+        msg["From"] = f"Green Candle Contact <{from_email}>"
+        msg["To"] = to_email
+        msg["Reply-To"] = user_email
+        msg["Subject"] = f"Contact Form: {name or 'Unknown'}"
+
+        body = f"""New contact form submission from greencandledispatch.com
+
+Name: {name or 'Not provided'}
+Email: {user_email}
+
+Message:
+{message or 'No message provided'}
+
+---
+Sent at {datetime.now().isoformat()}
+"""
+        msg.attach(MIMEText(body, "plain"))
+
+        with smtplib.SMTP_SSL(host, port) as server:
+            server.login(user, password)
+            server.send_message(msg)
+
+        return {"status": "success", "sent_to": to_email}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

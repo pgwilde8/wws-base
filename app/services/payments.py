@@ -238,100 +238,34 @@ class RevenueService:
     @staticmethod
     def get_card_eligibility(engine: Optional[Engine], trucker_id: int) -> dict[str, Any]:
         """
-        Check if a trucker is eligible to request a debit card (Month 5 = 150 days).
-        
-        Returns:
-            {
-                "eligible": bool,
-                "days_until_eligible": int,  # Days until they hit 150 days
-                "oldest_reward_age_days": int,  # Age of oldest reward in days
-                "vesting_progress_pct": float,  # Progress toward Month 5 (0-100)
-                "card_status": str  # Current card status if exists
-            }
+        Check if a trucker is eligible to request a debit card.
+        Automation Fuel model: eligible when they have Available Fuel (claimable_balance > 0).
         """
         if not engine or not trucker_id:
             return {
                 "eligible": False,
-                "days_until_eligible": 180,
+                "days_until_eligible": 0,
                 "oldest_reward_age_days": 0,
                 "vesting_progress_pct": 0.0,
                 "card_status": "NOT_STARTED"
             }
-        
         try:
-            from datetime import datetime, timedelta
-            from app.services.token_price import TokenPriceService
-            
+            from app.services.vesting import VestingService
             with engine.begin() as conn:
-                # Get MC number
-                mc_row = conn.execute(
-                    text("SELECT mc_number FROM webwise.trucker_profiles WHERE id = :trucker_id"),
-                    {"trucker_id": trucker_id}
-                ).fetchone()
-                
-                if not mc_row or not mc_row[0]:
-                    return {
-                        "eligible": False,
-                        "days_until_eligible": 180,
-                        "oldest_reward_age_days": 0,
-                        "vesting_progress_pct": 0.0,
-                        "card_status": "NOT_STARTED"
-                    }
-                
-                mc_number = mc_row[0]
-                
-                # Get oldest reward entry
-                oldest = conn.execute(
-                    text("""
-                        SELECT earned_at
-                        FROM webwise.driver_savings_ledger
-                        WHERE driver_mc_number = :mc
-                        ORDER BY earned_at ASC
-                        LIMIT 1
-                    """),
-                    {"mc": mc_number}
-                ).fetchone()
-                
-                # Get card status
                 card_row = conn.execute(
                     text("SELECT status FROM webwise.debit_cards WHERE trucker_id = :trucker_id"),
                     {"trucker_id": trucker_id}
                 ).fetchone()
-                card_status = card_row[0] if card_row else "NOT_STARTED"
-                
-                if not oldest or not oldest[0]:
-                    return {
-                        "eligible": False,
-                        "days_until_eligible": 180,
-                        "oldest_reward_age_days": 0,
-                        "vesting_progress_pct": 0.0,
-                        "card_status": card_status
-                    }
-                
-                # Calculate age of oldest reward
-                earned_at = oldest[0]
-                if isinstance(earned_at, str):
-                    from dateutil import parser
-                    earned_at = parser.parse(earned_at)
-                
-                now = datetime.now(earned_at.tzinfo) if hasattr(earned_at, 'tzinfo') and earned_at.tzinfo else datetime.now()
-                age_days = (now - earned_at).days if isinstance(earned_at, datetime) else 0
-                
-                # Month 5 eligibility = 150 days
-                month_5_threshold = 150
-                eligible = age_days >= month_5_threshold
-                days_until_eligible = max(0, month_5_threshold - age_days)
-                
-                # Calculate vesting progress (0-100%)
-                vesting_progress_pct = min(100.0, (age_days / month_5_threshold) * 100)
-                
-                return {
-                    "eligible": eligible,
-                    "days_until_eligible": days_until_eligible,
-                    "oldest_reward_age_days": age_days,
-                    "vesting_progress_pct": vesting_progress_pct,
-                    "card_status": card_status
-                }
+            card_status = card_row[0] if card_row else "NOT_STARTED"
+            claimable = VestingService.get_claimable_balance(engine, trucker_id)
+            eligible = claimable > 0 and card_status == "NOT_STARTED"
+            return {
+                "eligible": eligible,
+                "days_until_eligible": 0,
+                "oldest_reward_age_days": 0,
+                "vesting_progress_pct": 100.0 if eligible else 0.0,
+                "card_status": card_status
+            }
                 
         except Exception as e:
             print(f"Error checking card eligibility: {e}")
