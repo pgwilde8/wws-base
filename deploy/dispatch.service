@@ -1,0 +1,18 @@
+[Unit]
+Description=Green Candle Dispatch (FastAPI on port 8990)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/projects/client/dispatch
+EnvironmentFile=-/srv/projects/client/dispatch/.env
+Environment=PORT=8990
+ExecStart=/srv/projects/client/dispatch/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8990
+Restart=always
+RestartSec=5
+# Optional: run as a dedicated user (create with: sudo useradd -r -s /bin/false dispatch)
+# User=dispatch
+# Group=dispatch
+
+[Install]
+WantedBy=multi-user.target

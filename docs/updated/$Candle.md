@@ -1,8 +1,4 @@
-Great — since you already have a **Coinbase business (corporate) account**, you’re 90% of the way there. Now your goal is simply to move **USDC from Coinbase → your burn executor wallet on Base**, so your ChainGateway can execute burns.
 
-Here is the exact step-by-step process.
-
----
 
 # Step 1 — Create your burn executor wallet (one time)
 

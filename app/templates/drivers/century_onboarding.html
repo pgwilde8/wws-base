@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Get Funded — Century Finance | Green Candle Dispatch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-white font-sans antialiased min-h-screen pb-20">
+
+    <div class="p-4 border-b border-slate-800 bg-slate-900 sticky top-0 z-50">
+        <div class="flex justify-between items-center">
+            <h1 class="text-lg font-bold text-green-400"><i class="fas fa-file-invoice-dollar mr-2"></i>Get Funded</h1>
+            <span class="w-20"></span>
+        </div>
+    </div>
+
+    <section class="max-w-2xl mx-auto px-4 py-8 space-y-6">
+        {% if already_submitted %}
+        <div class="bg-blue-900/40 border border-blue-500/50 rounded-xl p-6 text-center">
+            <h2 class="text-xl font-bold text-white mb-2">Application Submitted</h2>
+            <p class="text-sm text-blue-200">Your info has been sent to Alma at Century Finance. She'll reach out within 1–2 business days.</p>
+            <p class="text-xs text-blue-300 mt-2">Once approved, your dashboard will unlock automatically. If declined, you'll receive a full refund.</p>
+        </div>
+        {% else %}
+        <header class="text-center space-y-2">
+            <div class="bg-green-900/40 border border-green-500/50 rounded-xl p-4 mb-4">
+                <h2 class="text-xl font-bold text-green-200 mb-1">✓ Payment Received!</h2>
+                <p class="text-sm text-green-100">Your account is reserved. Now let's get you funded.</p>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Century Finance Funding Application</h2>
+            <p class="text-sm text-slate-400">Alma at Century Finance will personally review your application (usually 1–2 business days). Once approved, your full dashboard unlocks automatically.</p>
+            <p class="text-xs text-slate-500">If declined, you'll receive a full refund of your $25 setup fee.</p>
+        </header>
+
+        {% if success and message %}
+        <div class="p-4 bg-green-900/40 border border-green-500/50 rounded-xl text-green-200 text-center text-sm">
+            {{ message }}
+        </div>
+        {% endif %}
+        {% if error %}
+        <div class="p-4 bg-red-900/40 border border-red-500/50 rounded-xl text-red-200 text-center text-sm">
+            {{ error }}
+        </div>
+        {% endif %}
+        {% if errors %}
+        <div class="p-4 bg-amber-900/40 border border-amber-500/50 rounded-xl text-amber-200 text-sm">
+            <ul class="list-disc list-inside space-y-1">
+                {% for _field, msg in errors.items() %}<li>{{ msg }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div class="bg-slate-900 rounded-xl border border-slate-800 p-5 shadow-lg">
+            <form action="/drivers/century-onboarding" method="POST" class="space-y-4" id="factoring-form">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs text-slate-400 mb-1" for="full_name">Full name <span class="text-red-400">*</span></label>
+                        <input id="full_name" name="full_name" type="text" required value="{{ prefill.full_name|e }}" placeholder="Jane Doe" class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1" for="email">Email <span class="text-red-400">*</span></label>
+                        <input id="email" name="email" type="email" required value="{{ prefill.email|e }}" placeholder="you@example.com" class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1" for="cell_phone">Cell phone <span class="text-red-400">*</span></label>
+                        <input id="cell_phone" name="cell_phone" type="tel" required value="{{ prefill.cell_phone|e }}" placeholder="(555) 123-4567" class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1" for="secondary_phone">Office / home (optional)</label>
+                        <input id="secondary_phone" name="secondary_phone" type="tel" value="{{ prefill.secondary_phone|e }}" placeholder="(555) 987-6543" class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1" for="company_name">Company name <span id="company-required-label" class="text-slate-500">(required if fleet)</span></label>
+                        <input id="company_name" name="company_name" type="text" value="{{ prefill.company_name|e }}" placeholder="Your Trucking LLC" class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1" for="mc_number">MC # <span class="text-red-400">*</span></label>
+                        <input id="mc_number" name="mc_number" type="text" required value="{{ prefill.mc_number|e }}" placeholder="123456" class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1" for="number_of_trucks">Number of trucks <span class="text-red-400">*</span></label>
+                        <input id="number_of_trucks" name="number_of_trucks" type="number" min="1" required value="{{ prefill.number_of_trucks|e }}" placeholder="1" class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
+                        <input type="checkbox" name="interested_fuel_card" value="true" class="rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500" />
+                        I am interested in Fuel Card Discounts
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-700 pt-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1" for="estimated_monthly_volume">Est. monthly loads / volume (optional)</label>
+                        <input id="estimated_monthly_volume" name="estimated_monthly_volume" type="text" placeholder="e.g. 20" class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1" for="current_factoring_company">Current factoring company (optional)</label>
+                        <select id="current_factoring_company" name="current_factoring_company" class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none">
+                            <option value="">—</option>
+                            <option value="None">None</option>
+                            <option value="OTR">OTR</option>
+                            <option value="RTS">RTS</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1" for="preferred_funding_speed">Preferred funding speed (optional)</label>
+                        <select id="preferred_funding_speed" name="preferred_funding_speed" class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none">
+                            <option value="">—</option>
+                            <option value="same-day">Same-day</option>
+                            <option value="next-day">Next-day</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-xl transition text-sm">Submit to Alma</button>
+            </form>
+        </div>
+        {% endif %}
+    </section>
+
+    <script>
+    (function() {
+        var numTrucks = document.getElementById('number_of_trucks');
+        var companyLabel = document.getElementById('company-required-label');
+        var companyInput = document.getElementById('company_name');
+        function updateCompanyRequired() {
+            var n = parseInt(numTrucks.value, 10) || 0;
+            if (n > 1) {
+                companyLabel.textContent = '(required for fleet)';
+                companyLabel.classList.remove('text-slate-500');
+                companyLabel.classList.add('text-amber-400');
+                companyInput.required = true;
+            } else {
+                companyLabel.textContent = '(required if fleet)';
+                companyLabel.classList.add('text-slate-500');
+                companyLabel.classList.remove('text-amber-400');
+                companyInput.required = false;
+            }
+        }
+        if (numTrucks) {
+            numTrucks.addEventListener('change', updateCompanyRequired);
+            numTrucks.addEventListener('input', updateCompanyRequired);
+            updateCompanyRequired();
+        }
+    })();
+    </script>
+</body>
+</html>

@@ -42,13 +42,18 @@
     const chatInput = document.getElementById('chat-input');
     const chatMessages = document.getElementById('chat-messages');
     const chatSend = document.getElementById('chat-send');
-    let threadId = null;
+    let responseId = null;
+    let greetingShown = false;
 
     function toggleChat(show) {
       const isHidden = chatPanel.classList.contains('hidden');
       if (show === true || (isHidden && show === undefined)) {
         chatPanel.classList.remove('hidden');
         chatInput.focus();
+        // Show greeting when chat opens for first time
+        if (!greetingShown && chatMessages.children.length === 1) {
+          showGreeting();
+        }
       } else {
         chatPanel.classList.add('hidden');
       }
@@ -61,7 +66,17 @@
       bubble.className = role === 'user'
         ? 'inline-block bg-emerald-600 text-white px-3 py-2 rounded-xl text-sm'
         : 'inline-block bg-gray-800 text-gray-100 px-3 py-2 rounded-xl text-sm';
-      bubble.textContent = text;
+      
+      // Make links clickable in assistant messages
+      if (role === 'assistant') {
+        bubble.innerHTML = text.replace(
+          /(\/(?:beta\/apply|register|login\/client|register-trucker))/g,
+          '<a href="$1" class="text-emerald-400 hover:text-emerald-300 underline font-semibold">$1</a>'
+        );
+      } else {
+        bubble.textContent = text;
+      }
+      
       div.appendChild(bubble);
       chatMessages.appendChild(div);
       chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -74,7 +89,7 @@
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, thread_id: threadId }),
+          body: JSON.stringify({ message: text, response_id: responseId }),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -82,13 +97,30 @@
           appendMessage('assistant', msg);
         } else {
           const data = await res.json();
-          threadId = data.thread_id || threadId;
+          responseId = data.response_id || data.conversation_id || responseId;
           appendMessage('assistant', data.reply || 'No response');
         }
       } catch (e) {
         appendMessage('assistant', 'Network error, please try again.');
       } finally {
         chatSend.disabled = false;
+      }
+    }
+
+    async function showGreeting() {
+      if (greetingShown) return;
+      try {
+        const res = await fetch('/api/chat/greeting');
+        if (res.ok) {
+          const data = await res.json();
+          responseId = data.response_id || data.conversation_id;
+          appendMessage('assistant', data.reply || 'Hey! I\'m the Green Candle AI. Looking for loads or want to hear about our 2% dispatch fee?');
+          greetingShown = true;
+        }
+      } catch (e) {
+        // Fallback greeting if API fails
+        appendMessage('assistant', 'Hey! I\'m the Green Candle AI. Looking for loads or want to hear about our 2% dispatch fee?');
+        greetingShown = true;
       }
     }
 
@@ -101,6 +133,14 @@
       chatInput.value = '';
       sendMessage(text);
     });
+    
+    // Show greeting on page load if chat is visible (optional)
+    // Uncomment if you want greeting to show automatically:
+    // setTimeout(() => {
+    //   if (!chatPanel.classList.contains('hidden') && !greetingShown) {
+    //     showGreeting();
+    //   }
+    // }, 500);
   </script>
 </body>
 

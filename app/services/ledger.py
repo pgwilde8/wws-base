@@ -1,6 +1,14 @@
 """
 Ledger Service: Service credits from the 2% dispatch fee.
 SEC-safe: dollar-blind—uses fixed percentages only. No hardcoded $38 or $13.
+
+IMPORTANT: As of 2026, ALL $CANDLE service credits are IMMEDIATE-USE.
+            No vesting, no locking, no unlocks_at delays.
+            Previous 6-month vesting/locking was removed.
+            Ignore any older docs mentioning vesting — they are legacy and deprecated.
+            
+            Credits are issued with status='CREDITED' and unlocks_at=now().
+            They are available immediately for automation features.
 """
 from decimal import Decimal
 from datetime import datetime

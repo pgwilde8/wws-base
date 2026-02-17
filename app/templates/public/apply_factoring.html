@@ -1,0 +1,130 @@
+{% extends "layout/base.html" %}
+
+{% block title %}Get funded first — Century Finance | Green Candle Dispatch{% endblock %}
+
+{% block content %}
+<section class="max-w-3xl mx-auto px-4 py-16 space-y-8">
+	<header class="text-center space-y-3">
+		<p class="text-sm uppercase tracking-[0.3em] text-emerald-200">No account required</p>
+		<h1 class="text-4xl sm:text-5xl font-extrabold text-white">Get funded first with Century Finance</h1>
+		<p class="text-lg text-gray-300">Same-day funding, fuel card discounts, and personalized rates. Alma at Century Finance will reach out within 1–2 business days. After you're approved and signed with Century, come back here to complete your dispatch setup with us — no setup fee until then.</p>
+		<p class="text-sm text-gray-400">We may earn a referral fee if you sign up with Century — it helps support Green Candle. No obligation.</p>
+	</header>
+
+	{% if success and message %}
+	<div class="max-w-xl mx-auto p-4 bg-emerald-900/40 border border-emerald-500/50 rounded-xl text-emerald-200 text-center text-sm">
+		{{ message }}
+	</div>
+	{% endif %}
+	{% if error %}
+	<div class="max-w-xl mx-auto p-4 bg-red-900/40 border border-red-500/50 rounded-xl text-red-200 text-center">
+		{{ error }}
+	</div>
+	{% endif %}
+	{% if errors %}
+	<div class="max-w-xl mx-auto p-4 bg-amber-900/40 border border-amber-500/50 rounded-xl text-amber-200 text-sm">
+		<ul class="list-disc list-inside space-y-1">
+			{% for _field, msg in errors.items() %}<li>{{ msg }}</li>{% endfor %}
+		</ul>
+	</div>
+	{% endif %}
+
+	<div class="bg-gray-900/60 border border-gray-800 rounded-2xl p-6 shadow-lg">
+		<form action="/apply/factoring" method="POST" class="space-y-4" id="factoring-form">
+			<div class="grid sm:grid-cols-2 gap-4">
+				<div class="sm:col-span-2">
+					<label class="block text-sm text-gray-300 mb-1" for="full_name">Full name <span class="text-red-400">*</span></label>
+					<input id="full_name" name="full_name" type="text" required value="{{ prefill.full_name|e }}" placeholder="Jane Doe" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+				</div>
+				<div>
+					<label class="block text-sm text-gray-300 mb-1" for="email">Email <span class="text-red-400">*</span></label>
+					<input id="email" name="email" type="email" required value="{{ prefill.email|e }}" placeholder="you@example.com" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+				</div>
+				<div>
+					<label class="block text-sm text-gray-300 mb-1" for="cell_phone">Cell phone <span class="text-red-400">*</span></label>
+					<input id="cell_phone" name="cell_phone" type="tel" required value="{{ prefill.cell_phone|e }}" placeholder="(555) 123-4567" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+				</div>
+				<div>
+					<label class="block text-sm text-gray-300 mb-1" for="secondary_phone">Office / home (optional)</label>
+					<input id="secondary_phone" name="secondary_phone" type="tel" value="{{ prefill.secondary_phone|e }}" placeholder="(555) 987-6543" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+				</div>
+				<div>
+					<label class="block text-sm text-gray-300 mb-1" for="company_name">Company name <span id="company-required-label" class="text-gray-500">(required if fleet)</span></label>
+					<input id="company_name" name="company_name" type="text" value="{{ prefill.company_name|e }}" placeholder="Your Trucking LLC" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+				</div>
+				<div>
+					<label class="block text-sm text-gray-300 mb-1" for="mc_number">MC # <span class="text-red-400">*</span></label>
+					<input id="mc_number" name="mc_number" type="text" required value="{{ prefill.mc_number|e }}" placeholder="123456" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+				</div>
+				<div>
+					<label class="block text-sm text-gray-300 mb-1" for="number_of_trucks">Number of trucks <span class="text-red-400">*</span></label>
+					<input id="number_of_trucks" name="number_of_trucks" type="number" min="1" required value="{{ prefill.number_of_trucks|e }}" placeholder="1" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+				</div>
+			</div>
+
+			<div>
+				<label class="flex items-center gap-2 cursor-pointer text-sm text-gray-300">
+					<input type="checkbox" name="interested_fuel_card" value="true" class="rounded border-gray-600 bg-gray-800 text-emerald-500 focus:ring-emerald-500" />
+					I am interested in Fuel Card Discounts
+				</label>
+			</div>
+
+			<div class="grid sm:grid-cols-2 gap-4 border-t border-gray-700 pt-4">
+				<div>
+					<label class="block text-sm text-gray-300 mb-1" for="estimated_monthly_volume">Est. monthly loads / volume (optional)</label>
+					<input id="estimated_monthly_volume" name="estimated_monthly_volume" type="text" placeholder="e.g. 20" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-3 py-2 focus:border-emerald-500 focus:outline-none" />
+				</div>
+				<div>
+					<label class="block text-sm text-gray-300 mb-1" for="current_factoring_company">Current factoring company (optional)</label>
+					<select id="current_factoring_company" name="current_factoring_company" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-3 py-2 focus:border-emerald-500 focus:outline-none">
+						<option value="">—</option>
+						<option value="None">None</option>
+						<option value="OTR">OTR</option>
+						<option value="RTS">RTS</option>
+						<option value="Other">Other</option>
+					</select>
+				</div>
+				<div>
+					<label class="block text-sm text-gray-300 mb-1" for="preferred_funding_speed">Preferred funding speed (optional)</label>
+					<select id="preferred_funding_speed" name="preferred_funding_speed" class="w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-3 py-2 focus:border-emerald-500 focus:outline-none">
+						<option value="">—</option>
+						<option value="same-day">Same-day</option>
+						<option value="next-day">Next-day</option>
+					</select>
+				</div>
+			</div>
+
+			<button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 rounded-xl transition">Apply now — no account required</button>
+		</form>
+	</div>
+
+	<p class="text-center text-sm text-gray-500">Your info is sent to Alma at Century Finance. We don't charge you anything until you're set up with our partner and ready for dispatch.</p>
+</section>
+
+<script>
+(function() {
+	var numTrucks = document.getElementById('number_of_trucks');
+	var companyLabel = document.getElementById('company-required-label');
+	var companyInput = document.getElementById('company_name');
+	function updateCompanyRequired() {
+		var n = parseInt(numTrucks.value, 10) || 0;
+		if (n > 1) {
+			companyLabel.textContent = '(required for fleet)';
+			companyLabel.classList.remove('text-gray-500');
+			companyLabel.classList.add('text-amber-400');
+			companyInput.required = true;
+		} else {
+			companyLabel.textContent = '(required if fleet)';
+			companyLabel.classList.add('text-gray-500');
+			companyLabel.classList.remove('text-amber-400');
+			companyInput.required = false;
+		}
+	}
+	if (numTrucks) {
+		numTrucks.addEventListener('change', updateCompanyRequired);
+		numTrucks.addEventListener('input', updateCompanyRequired);
+		updateCompanyRequired();
+	}
+})();
+</script>
+{% endblock %}

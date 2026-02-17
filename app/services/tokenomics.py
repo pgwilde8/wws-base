@@ -60,57 +60,38 @@ def execute_buyback_and_send(driver_wallet: str, amount_in_usd: float):
 
 def credit_driver_savings(db, load_id: str, mc_number: str, fee_usd: float):
     """
-    1. Takes the Dispatch Fee (e.g., $60).
-    2. Calculates $CANDLE amount (Simple 1:1 ratio for Phase 1, or fetch live price).
-    3. Locks it in the Ledger for 6 months.
+    LEGACY FUNCTION - DEPRECATED.
     
-    Args:
-        db: SQLAlchemy Session (from Depends(get_db))
-        load_id: The load identifier
-        mc_number: Driver's MC number
-        fee_usd: The dispatch fee amount in USD
+    This function is kept for backward compatibility but should not be used.
+    Use app.services.ledger.process_load_settlement() instead.
+    
+    All credits are now immediate-use with no vesting or locking.
+    Previous 6-month vesting was removed.
     """
-    from datetime import datetime, timedelta
+    # Redirect to the new ledger service
+    from app.services.ledger import process_load_settlement
     from sqlalchemy import text
-    from app.services.token_price import TokenPriceService
     
-    # Calculate tokens based on current market price
-    # This ensures drivers see accurate token amounts and can track growth
-    current_price = TokenPriceService.get_candle_price()
-    tokens_earned = fee_usd / current_price if current_price > 0 else 0.0 
+    # Get trucker_id from mc_number
+    trucker_row = db.execute(
+        text("SELECT id FROM webwise.trucker_profiles WHERE mc_number = :mc LIMIT 1"),
+        {"mc": mc_number}
+    ).first()
     
-    # --- THE LOGIC ---
-    sql = text("""
-        INSERT INTO webwise.driver_savings_ledger 
-        (driver_mc_number, load_id, amount_usd, amount_candle, unlocks_at, status)
-        VALUES (:mc, :load, :usd, :tokens, :unlock, 'LOCKED')
-        RETURNING id;
-    """)
-    
-    # Calculate the lock date (6 months from now)
-    unlock_date = datetime.now() + timedelta(days=180)
-    
-    try:
-        result = db.execute(sql, {
-            "mc": mc_number,
-            "load": load_id,
-            "usd": fee_usd,
-            "tokens": tokens_earned,
-            "unlock": unlock_date
-        })
-        inserted_id = result.scalar()
-        db.commit()
-        
-        print(f"🔒 SAVINGS: {mc_number} earned {tokens_earned} $CANDLE (Locked until {unlock_date.date()}) [ID: {inserted_id}]")
-        return True
-        
-    except Exception as e:
-        import traceback
-        print(f"❌ DATABASE ERROR in credit_driver_savings: {e}")
-        print(f"   MC: {mc_number}, Load: {load_id}, Fee: ${fee_usd}")
-        traceback.print_exc()
-        db.rollback()
+    if not trucker_row:
         return False
+    
+    trucker_id = trucker_row[0]
+    
+    # Use the new immediate-use credit system
+    result = process_load_settlement(
+        engine=db.bind,
+        trucker_id=trucker_id,
+        load_id=load_id,
+        total_paid_by_broker=fee_usd
+    )
+    
+    return result.get("credits_issued", 0) > 0
 
 
 # --- TEST RUN ---

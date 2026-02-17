@@ -58,7 +58,7 @@ def create_setup_checkout_session(
 def retrieve_and_verify_session(session_id: str) -> Optional[dict]:
     """
     Retrieve Checkout Session and verify payment_status is 'paid'.
-    Returns metadata dict with user_id, truck_count if valid; else None.
+    Returns metadata dict with user_id, truck_count, payment_intent_id if valid; else None.
     """
     if not STRIPE_SECRET or not session_id:
         return None
@@ -69,6 +69,11 @@ def retrieve_and_verify_session(session_id: str) -> Optional[dict]:
         user_id = session.client_reference_id
         truck_count = int(session.metadata.get("truck_count", "1") or "1")
         truck_count = max(MIN_TRUCKS, min(MAX_TRUCKS, truck_count))
-        return {"user_id": int(user_id), "truck_count": truck_count}
+        payment_intent_id = session.payment_intent if hasattr(session, 'payment_intent') else None
+        return {
+            "user_id": int(user_id),
+            "truck_count": truck_count,
+            "payment_intent_id": payment_intent_id,
+        }
     except Exception:
         return None

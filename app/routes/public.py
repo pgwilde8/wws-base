@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Request, Form, Body, HTTPException, BackgroundTasks
+import os
+from fastapi import APIRouter, Request, Form, Body, HTTPException, BackgroundTasks, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from fastapi.responses import HTMLResponse, JSONResponse
 from app.services.load_board import LoadBoardService
-from app.services.email import parse_broker_reply, send_contact_form_email
+from app.services.email import parse_broker_reply, send_contact_form_email, send_factoring_referral_email
 #from app.core.templates import templates
 from app.core.deps import templates, engine, run_assistant_message
 
@@ -204,10 +205,84 @@ def testimonials_submit(
 
 @router.post("/api/chat")
 async def chat_api(payload: dict):
-    message = (payload.get("message") if payload else "") or ""
-    thread_id = payload.get("thread_id") if payload else None
-    result = run_assistant_message(message, thread_id)
-    return result
+    """
+    Chat endpoint using OpenAI Responses API.
+    
+    Payload:
+        - message: User's message (required)
+        - response_id: Previous response ID for threading (optional, for new conversations)
+    
+    Returns:
+        - reply: Assistant's response
+        - response_id: Response ID to use for next message (for threading)
+    """
+    try:
+        from app.core.chat_responses import run_responses_chat, get_greeting
+        
+        message = (payload.get("message") if payload else "") or ""
+        response_id = payload.get("response_id") if payload else None
+        
+        # If no message and no response_id, send greeting
+        if not message and not response_id:
+            return get_greeting()
+        
+        result = run_responses_chat(message=message, response_id=response_id)
+        return result
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (they have proper status codes)
+        raise
+    except Exception as e:
+        # Catch any other exceptions and return a proper error
+        import traceback
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"Chat API error: {error_type}: {error_msg}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Chat service error: {error_msg}"
+        )
+
+
+@router.get("/api/chat/greeting")
+async def chat_greeting():
+    """
+    Get a greeting message for new chat sessions.
+    
+    Returns:
+        - reply: Greeting message
+        - response_id: Response ID to use for first user message
+    """
+    try:
+        from app.core.chat_responses import get_greeting
+        return get_greeting()
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"Greeting API error: {error_type}: {error_msg}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Greeting service error: {error_msg}"
+        )
+
+
+@router.get("/apply/factoring", response_class=HTMLResponse)
+def apply_factoring_redirect(request: Request):
+    """Legacy public form — redirect to signup flow (all drivers now go through signup → payment → Century approval)."""
+    return RedirectResponse(url="/drivers/onboarding/welcome", status_code=302)
+
+
+
+
+@router.get("/driver/factoring-application", response_class=HTMLResponse)
+def factoring_application_redirect(request: Request):
+    """Legacy / public link: send to public apply flow (no login required)."""
+    return RedirectResponse(url="/apply/factoring", status_code=302)
 
 
 @router.get("/find-loads", response_class=HTMLResponse)

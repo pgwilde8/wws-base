@@ -7,7 +7,8 @@ from app.core.deps import templates, engine, require_admin, get_db
 from app.services.payments import RevenueService
 from app.services.beta_activation import update_beta_activity, STAGE_FIRST_LOAD_WON
 from app.services.referral import ReferralService
-from app.services.email import send_negotiation_email, parse_broker_reply
+from app.services.email import send_negotiation_email, parse_broker_reply, send_century_approval_email, send_century_decline_email
+import os
 from app.services.buyback_notifications import BuybackNotificationService
 from sqlalchemy.orm import Session
 
@@ -818,3 +819,190 @@ async def ship_card(card_id: int, request: Request):
             ''',
             headers={"HX-Trigger": "cardShipped"}
         )
+
+
+@router.get("/admin/century-approvals", dependencies=[Depends(require_admin)], response_class=HTMLResponse)
+def century_approvals_page(request: Request):
+    """Admin page: List pending Century Finance referrals for approval/decline."""
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    referrals = []
+    declined_referrals = []
+    with engine.begin() as conn:
+        rows = conn.execute(text("""
+            SELECT fr.id, fr.full_name, fr.email, fr.cell_phone, fr.driver_mc_number, fr.number_of_trucks,
+                   fr.status, fr.submitted_at, fr.payment_intent_id, fr.refunded_at,
+                   tp.id AS trucker_id, tp.display_name
+            FROM webwise.factoring_referrals fr
+            LEFT JOIN webwise.trucker_profiles tp ON tp.id = fr.trucker_id
+            WHERE fr.status IN ('PENDING', 'CONTACTED')
+            ORDER BY fr.submitted_at DESC
+        """))
+        referrals = [dict(r._mapping) for r in rows]
+        declined_rows = conn.execute(text("""
+            SELECT id, full_name, driver_mc_number, refunded_at, refund_status
+            FROM webwise.factoring_referrals
+            WHERE status = 'DECLINED'
+            ORDER BY refunded_at DESC NULLS LAST
+            LIMIT 20
+        """))
+        declined_referrals = [dict(r._mapping) for r in declined_rows]
+    return templates.TemplateResponse(
+        "admin/century_approvals.html",
+        {"request": request, "referrals": referrals, "declined_referrals": declined_referrals},
+    )
+
+
+@router.post("/admin/century-approvals/{referral_id}/approve", dependencies=[Depends(require_admin)])
+def approve_century_referral(referral_id: int):
+    """Mark Century referral as APPROVED → unlock dashboard, send congrats email."""
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("""
+                SELECT fr.trucker_id, fr.email, fr.driver_mc_number, fr.full_name, tp.user_id
+                FROM webwise.factoring_referrals fr
+                LEFT JOIN webwise.trucker_profiles tp ON tp.id = fr.trucker_id
+                WHERE fr.id = :rid
+            """),
+            {"rid": referral_id},
+        ).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Referral not found")
+        trucker_id = row[0]
+        user_id = row[4]
+        # Update status to APPROVED
+        conn.execute(
+            text("UPDATE webwise.factoring_referrals SET status = 'APPROVED', signed_at = now() WHERE id = :rid"),
+            {"rid": referral_id},
+        )
+        # Unlock dashboard: call onboard_new_driver if not already onboarded
+        if trucker_id and user_id:
+            from app.services.onboarding import onboard_new_driver
+            try:
+                with engine.begin() as conn2:
+                    tp_row = conn2.execute(
+                        text("SELECT display_name, mc_number, dot_number FROM webwise.trucker_profiles WHERE id = :tid"),
+                        {"tid": trucker_id},
+                    ).first()
+                    if tp_row:
+                        mc_val = (tp_row[1] or tp_row[2] or "").strip()
+                        dot_val = (tp_row[2] or "").strip()
+                        display_name = (tp_row[0] or "").strip().lower()
+                        number_of_trucks = conn2.execute(
+                            text("SELECT number_of_trucks FROM webwise.factoring_referrals WHERE id = :rid"),
+                            {"rid": referral_id},
+                        ).scalar() or 1
+                        tier = "FLEET" if number_of_trucks >= 2 else "SOLO"
+                        onboard_new_driver(engine, user_id, mc_val, dot_val, display_name, tier)
+            except Exception as e:
+                logger.warning(f"Failed to onboard driver after Century approval: {e}")
+        # Send congrats email to driver
+        if row[1]:  # email
+            send_century_approval_email(row[3] or "Driver", row[1])
+    return RedirectResponse(url="/admin/century-approvals", status_code=303)
+
+
+@router.post("/admin/century-approvals/{referral_id}/decline", dependencies=[Depends(require_admin)])
+def decline_century_referral(referral_id: int):
+    """Mark Century referral as DECLINED → trigger Stripe refund, send decline email."""
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    stripe_secret = os.getenv("STRIPE_SECRET_KEY")
+    if stripe_secret:
+        try:
+            import stripe
+            stripe.api_key = stripe_secret
+        except ImportError:
+            stripe_secret = None  # Stripe not installed
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT payment_intent_id, email, full_name, status FROM webwise.factoring_referrals WHERE id = :rid"),
+            {"rid": referral_id},
+        ).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Referral not found")
+        if row[3] == "DECLINED":
+            return RedirectResponse(url="/admin/century-approvals?error=already_declined", status_code=303)
+        payment_intent_id = row[0]
+        email = row[1]
+        full_name = row[2] or "Driver"
+        # Update status to DECLINED and refund_status to PENDING (before attempt)
+        conn.execute(
+            text("""
+                UPDATE webwise.factoring_referrals
+                SET status = 'DECLINED', refunded_at = now(), refund_status = 'PENDING'
+                WHERE id = :rid
+            """),
+            {"rid": referral_id},
+        )
+    # Trigger Stripe refund outside the same conn so we can update refund_status after
+    refund_status_text = None
+    refund_status_db = "FAILED"  # no payment_intent or no Stripe config
+    if payment_intent_id and stripe_secret:
+        try:
+            refund = stripe.Refund.create(payment_intent=payment_intent_id)
+            logger.info(f"Refunded {payment_intent_id} for declined referral {referral_id}: {refund.id}")
+            refund_status_text = f"We've processed your full $25 setup fee refund via Stripe (Refund ID: {refund.id}). It should appear in 3–10 business days. Check your Stripe receipt or bank statement."
+            refund_status_db = "SUCCEEDED"
+        except Exception as e:
+            logger.error(f"Failed to refund {payment_intent_id}: {e}")
+            refund_status_text = "We're processing your full $25 setup fee refund. If you don't see it in 3–10 business days, please contact support."
+            refund_status_db = "FAILED"
+    else:
+        refund_status_text = "We're processing your full $25 setup fee refund. If you don't see it in 3–10 business days, please contact support."
+    if engine:
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE webwise.factoring_referrals SET refund_status = :rs WHERE id = :rid"),
+                {"rs": refund_status_db, "rid": referral_id},
+            )
+    if email:
+        send_century_decline_email(full_name, email, refund_status_text)
+    return RedirectResponse(url="/admin/century-approvals", status_code=303)
+
+
+@router.post("/admin/century-approvals/{referral_id}/retry-refund", dependencies=[Depends(require_admin)])
+def retry_century_refund(referral_id: int):
+    """Retry Stripe refund when refund_status is FAILED."""
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    stripe_secret = os.getenv("STRIPE_SECRET_KEY")
+    if not stripe_secret:
+        return RedirectResponse(url="/admin/century-approvals?error=no_stripe", status_code=303)
+    try:
+        import stripe
+        stripe.api_key = stripe_secret
+    except ImportError:
+        return RedirectResponse(url="/admin/century-approvals?error=no_stripe", status_code=303)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT payment_intent_id, status, refund_status FROM webwise.factoring_referrals WHERE id = :rid"),
+            {"rid": referral_id},
+        ).first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Referral not found")
+        if row[1] != "DECLINED" or row[2] != "FAILED":
+            return RedirectResponse(url="/admin/century-approvals?error=retry_invalid", status_code=303)
+        payment_intent_id = row[0]
+    if not payment_intent_id:
+        if engine:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("UPDATE webwise.factoring_referrals SET refund_status = 'FAILED' WHERE id = :rid"),
+                    {"rid": referral_id},
+                )
+        return RedirectResponse(url="/admin/century-approvals?error=no_pi", status_code=303)
+    try:
+        refund = stripe.Refund.create(payment_intent=payment_intent_id)
+        logger.info(f"Retry refund succeeded for referral {referral_id}: {refund.id}")
+        if engine:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("UPDATE webwise.factoring_referrals SET refund_status = 'SUCCEEDED' WHERE id = :rid"),
+                    {"rid": referral_id},
+                )
+    except Exception as e:
+        logger.error(f"Retry refund failed for referral {referral_id}: {e}")
+    return RedirectResponse(url="/admin/century-approvals", status_code=303)

@@ -19,7 +19,8 @@ from app.services.storage import upload_bol, upload_load_document
 from app.services.factoring import push_invoice_to_factor, send_packet_to_factor
 from app.services.tokenomics import credit_driver_savings
 from app.services.buyback_notifications import BuybackNotificationService
-from app.services.email import send_negotiation_email
+from app.services.email import send_negotiation_email, send_factoring_referral_email
+import stripe
 from app.services.ai_logic import extract_bid_details, parse_sender_email
 from app.services.calculator import calculate_break_even, DEFAULT_FUEL_PRICE
 from app.services.market_intel import get_market_average, parse_origin_dest_states
@@ -68,6 +69,31 @@ def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_us
     has_mc_or_dot = bool(mc_val or dot_val)
     if not row or not has_display_name or not has_mc_or_dot:
         return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+    trucker_id = row[0]
+    # GATEKEEPER: Check Century Finance approval (unless beta driver)
+    if not is_beta_driver(profile_for_beta):
+        with engine.begin() as conn:
+            century_status = conn.execute(
+                text("SELECT status FROM webwise.factoring_referrals WHERE trucker_id = :tid ORDER BY submitted_at DESC LIMIT 1"),
+                {"tid": trucker_id},
+            ).scalar()
+            # If no referral exists yet, redirect to century-onboarding (they need to submit after payment)
+            # If PENDING, allow dashboard but show pending message (or redirect to century-onboarding if they haven't submitted)
+            # If APPROVED/SIGNED, allow full dashboard
+            # If DECLINED, allow dashboard but show declined message (refund processed)
+            if century_status is None:
+                # Check if they've paid (have a payment_intent somewhere) — if yes, redirect to century-onboarding
+                # For now, if no referral exists, assume they need to complete onboarding → redirect to century-onboarding
+                # But only if they've completed profile setup (name + MC)
+                return RedirectResponse(url="/drivers/century-onboarding", status_code=303)
+            elif century_status in ("PENDING", "CONTACTED"):
+                # Submitted but not approved yet — show dashboard with pending banner (or redirect)
+                # For now, allow dashboard access but could add a banner
+                pass  # Allow through, dashboard can show pending message
+            elif century_status == "DECLINED":
+                # Declined — allow dashboard but show declined message
+                pass  # Allow through, dashboard can show declined/refund message
+            # APPROVED/SIGNED → allow full dashboard (no redirect)
     api_key_raw = row[4] if row and len(row) > 4 else None
     api_key_display = None
     if api_key_raw and len(api_key_raw) >= 8:
@@ -78,6 +104,14 @@ def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_us
     show_beta_banner = is_beta_driver(profile_for_beta)
     balance = VestingService.get_claimable_balance(engine, trucker["id"])
     balance_val = balance or 0
+    # Get Century status for dashboard banner
+    century_status_for_banner = None
+    if not is_beta_driver(profile_for_beta) and engine:
+        with engine.begin() as conn:
+            century_status_for_banner = conn.execute(
+                text("SELECT status FROM webwise.factoring_referrals WHERE trucker_id = :tid ORDER BY submitted_at DESC LIMIT 1"),
+                {"tid": trucker["id"]},
+            ).scalar()
     # First Mission tutorial: exactly starter balance (10 or 50 $CANDLE) and zero negotiations
     is_new_driver = False
     if round(balance_val, 1) in (10.0, 50.0):
@@ -96,6 +130,7 @@ def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_us
             "is_new_driver": is_new_driver,
             "scout_api_key_display": api_key_display,
             "show_beta_banner": show_beta_banner,
+            "century_status": century_status_for_banner,
         },
     )
 
@@ -840,7 +875,7 @@ def checkout_success(
     session_id: str = "",
     user: Optional[Dict] = Depends(current_user),
 ):
-    """Verify Stripe payment and complete onboarding. Redirects to dashboard."""
+    """Verify Stripe payment, store payment_intent_id, redirect to Century onboarding (NOT dashboard yet)."""
     if not user or user.get("role") != "client" or not engine:
         return RedirectResponse(url="/login/client", status_code=303)
     if not session_id:
@@ -850,7 +885,7 @@ def checkout_success(
     if not meta or int(meta["user_id"]) != user.get("id"):
         return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
     truck_count = meta["truck_count"]
-    tier = "FLEET" if truck_count >= 2 else "SOLO"
+    payment_intent_id = meta.get("payment_intent_id")
     with engine.begin() as conn:
         row = conn.execute(
             text("SELECT id, display_name, mc_number, dot_number FROM webwise.trucker_profiles WHERE user_id = :uid"),
@@ -859,20 +894,172 @@ def checkout_success(
         if not row or not (row.display_name or "").strip():
             return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
         mc_for_ledger = (row.mc_number or row.dot_number or "").strip()
-        dot_for_ledger = (row.dot_number or "").strip()
-        display_name = (row.display_name or "").strip().lower()
         if not mc_for_ledger:
             return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
-    from app.services.onboarding import onboard_new_driver
-    onboard_new_driver(
-        engine,
-        user.get("id"),
-        mc_for_ledger,
-        dot_for_ledger,
-        display_name,
-        tier,
+        # Store payment_intent_id on trucker_profile for refund capability (or in factoring_referrals later)
+        if payment_intent_id:
+            try:
+                conn.execute(
+                    text("UPDATE webwise.trucker_profiles SET notes = COALESCE(notes, '') || ' PaymentIntent: ' || :pi WHERE user_id = :uid"),
+                    {"pi": payment_intent_id, "uid": user.get("id")},
+                )
+            except Exception:
+                pass  # notes column might not exist or be text; store in factoring_referrals instead
+    # DO NOT call onboard_new_driver() yet — wait for Century approval
+    # Redirect to Century onboarding form instead
+    return RedirectResponse(url="/drivers/century-onboarding", status_code=303)
+
+
+@router.get("/drivers/century-onboarding", response_class=HTMLResponse)
+def century_onboarding_page(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Post-payment Century Finance referral form — prefilled, required before dashboard unlock."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    # GATEKEEPER: Must have completed payment before accessing Century form
+    if engine:
+        with engine.begin() as conn:
+            tp_row = conn.execute(
+                text("SELECT id, notes, is_beta FROM webwise.trucker_profiles WHERE user_id = :uid"),
+                {"uid": user.get("id")},
+            ).first()
+            if not tp_row:
+                return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+            # Beta drivers skip payment requirement
+            is_beta = bool(tp_row[2] if len(tp_row) > 2 else False)
+            if not is_beta:
+                # Check if they've paid (payment_intent_id stored in notes during checkout-success)
+                has_payment = bool(tp_row[1] and "PaymentIntent:" in (tp_row[1] or ""))
+                if not has_payment:
+                    # Redirect to payment step
+                    return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+    # Check if already submitted
+    if engine:
+        with engine.begin() as conn:
+            existing = conn.execute(
+                text("SELECT id FROM webwise.factoring_referrals WHERE trucker_id = (SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid) LIMIT 1"),
+                {"uid": user.get("id")},
+            ).first()
+            if existing:
+                # Already submitted — show success message or redirect to pending dashboard
+                return templates.TemplateResponse(
+                    "drivers/century_onboarding.html",
+                    {"request": request, "prefill": _factoring_prefill(user), "already_submitted": True},
+                )
+    prefill = _factoring_prefill(user)
+    return templates.TemplateResponse(
+        "drivers/century_onboarding.html",
+        {"request": request, "prefill": prefill},
     )
-    return RedirectResponse(url="/drivers/dashboard", status_code=303)
+
+
+@router.post("/drivers/century-onboarding", response_class=HTMLResponse)
+def century_onboarding_submit(
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+    full_name: str = Form(...),
+    email: str = Form(...),
+    cell_phone: str = Form(...),
+    secondary_phone: str = Form(None),
+    company_name: str = Form(None),
+    mc_number: str = Form(...),
+    number_of_trucks: int = Form(...),
+    interested_fuel_card: bool = Form(False),
+    estimated_monthly_volume: str = Form(None),
+    current_factoring_company: str = Form(None),
+    preferred_funding_speed: str = Form(None),
+):
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    errors = {}
+    if number_of_trucks > 1 and (not company_name or not company_name.strip()):
+        errors["company_name"] = "Company name is required for fleets (more than 1 truck)."
+    if errors:
+        prefill = _factoring_prefill(user)
+        prefill.update({
+            "full_name": full_name, "email": email, "cell_phone": cell_phone,
+            "secondary_phone": secondary_phone or "", "company_name": company_name or "",
+            "mc_number": mc_number, "number_of_trucks": number_of_trucks,
+        })
+        return templates.TemplateResponse(
+            "drivers/century_onboarding.html",
+            {"request": request, "prefill": prefill, "errors": errors},
+        )
+    to_email = "alma@centuryfinance.com"
+    cc_email = os.getenv("FACTORING_CC_EMAIL") or os.getenv("CONTACT_RECIPIENT_EMAIL")
+    referral_data = {
+        "full_name": full_name.strip(),
+        "email": email.strip().lower(),
+        "cell_phone": cell_phone.strip(),
+        "secondary_phone": secondary_phone.strip() if secondary_phone else None,
+        "company_name": company_name.strip() if company_name else None,
+        "mc_number": mc_number.strip(),
+        "number_of_trucks": number_of_trucks,
+        "interested_fuel_card": bool(interested_fuel_card),
+        "estimated_monthly_volume": float(estimated_monthly_volume) if estimated_monthly_volume and estimated_monthly_volume.replace(",", "").replace(".", "").isdigit() else None,
+        "current_factoring_company": (current_factoring_company or "").strip() or None,
+        "preferred_funding_speed": (preferred_funding_speed or "").strip() or None,
+        "referral_code": "GREEN CANDLE",
+    }
+    result = send_factoring_referral_email(referral_data, to_email=to_email, cc_email=cc_email)
+    trucker_id = None
+    payment_intent_id = None
+    if engine:
+        try:
+            with engine.begin() as conn:
+                r = conn.execute(text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"), {"uid": user.get("id")})
+                trucker_id = r.scalar()
+                # Get payment_intent_id from trucker_profiles notes (stored in checkout-success) or lookup from Stripe
+                if trucker_id:
+                    notes_row = conn.execute(
+                        text("SELECT notes FROM webwise.trucker_profiles WHERE id = :tid"),
+                        {"tid": trucker_id},
+                    ).scalar()
+                    if notes_row and "PaymentIntent:" in (notes_row or ""):
+                        payment_intent_id = notes_row.split("PaymentIntent:")[-1].strip().split()[0] if "PaymentIntent:" in notes_row else None
+            if trucker_id is not None:
+                with engine.begin() as conn:
+                    referral_id_result = conn.execute(text("""
+                        INSERT INTO webwise.factoring_referrals
+                        (trucker_id, full_name, email, cell_phone, secondary_phone, company_name, driver_mc_number, number_of_trucks,
+                         interested_fuel_card, estimated_monthly_volume, current_factoring_company, preferred_funding_speed, referral_code, status, payment_intent_id)
+                        VALUES (:trucker_id, :full_name, :email, :cell_phone, :secondary_phone, :company_name, :mc_number, :number_of_trucks,
+                                :interested_fuel_card, :estimated_monthly_volume, :current_factoring_company, :preferred_funding_speed, 'GREEN CANDLE', 'PENDING', :payment_intent_id)
+                        RETURNING id
+                    """), {
+                        "trucker_id": trucker_id,
+                        "full_name": referral_data["full_name"],
+                        "email": referral_data["email"],
+                        "cell_phone": referral_data["cell_phone"],
+                        "secondary_phone": referral_data["secondary_phone"],
+                        "company_name": referral_data["company_name"],
+                        "mc_number": referral_data["mc_number"],
+                        "number_of_trucks": referral_data["number_of_trucks"],
+                        "interested_fuel_card": referral_data["interested_fuel_card"],
+                        "estimated_monthly_volume": referral_data["estimated_monthly_volume"],
+                        "current_factoring_company": referral_data["current_factoring_company"],
+                        "preferred_funding_speed": referral_data["preferred_funding_speed"],
+                        "payment_intent_id": payment_intent_id,
+                    })
+                    referral_id = referral_id_result.scalar()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to store referral with payment_intent_id: {e}")
+            pass
+    if result.get("status") == "success":
+        return templates.TemplateResponse(
+            "drivers/century_onboarding.html",
+            {
+                "request": request,
+                "prefill": _factoring_prefill(user),
+                "success": True,
+                "message": "Payment received! Your info has been sent to Alma at Century Finance. She'll reach out within 1–2 business days. Once approved, your full dashboard will unlock automatically. If declined, you'll receive a full refund of your $25 setup fee.",
+            },
+        )
+    return templates.TemplateResponse(
+        "drivers/century_onboarding.html",
+        {"request": request, "prefill": _factoring_prefill(user), "error": result.get("message", "Failed to send. Please try again or contact us.")},
+    )
 
 
 @router.get("/drivers/dashboard-mission", response_class=HTMLResponse)
@@ -1001,6 +1188,134 @@ def onboarding_complete(request: Request, user: Optional[Dict] = Depends(current
     response = HTMLResponse(content="")
     response.headers["HX-Redirect"] = "/drivers/dashboard"
     return response
+
+
+def _factoring_prefill(user: Dict) -> Dict:
+    """Return prefill dict for factoring form from user + trucker profile."""
+    out = {"full_name": "", "email": user.get("email") or "", "cell_phone": "", "secondary_phone": "", "company_name": "", "mc_number": "", "number_of_trucks": 1}
+    if not engine:
+        return out
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("""
+                SELECT tp.display_name, tp.mc_number, tp.carrier_name
+                FROM webwise.trucker_profiles tp
+                WHERE tp.user_id = :uid
+            """),
+            {"uid": user.get("id")},
+        ).first()
+    if row:
+        out["full_name"] = (row[0] or "").strip()
+        out["mc_number"] = (row[1] or "").strip()
+        out["company_name"] = (row[2] or "").strip()
+    return out
+
+
+@router.get("/drivers/factoring-application", response_class=HTMLResponse)
+def get_factoring_application(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Century Finance referral form — auth required; pre-fill from profile."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    prefill = _factoring_prefill(user)
+    return templates.TemplateResponse(
+        "drivers/factoring_application.html",
+        {"request": request, "prefill": prefill},
+    )
+
+
+@router.post("/drivers/factoring-application", response_class=HTMLResponse)
+def submit_factoring_application(
+    request: Request,
+    user: Optional[Dict] = Depends(current_user),
+    full_name: str = Form(...),
+    email: str = Form(...),
+    cell_phone: str = Form(...),
+    secondary_phone: str = Form(None),
+    company_name: str = Form(None),
+    mc_number: str = Form(...),
+    number_of_trucks: int = Form(...),
+    interested_fuel_card: bool = Form(False),
+    estimated_monthly_volume: str = Form(None),
+    current_factoring_company: str = Form(None),
+    preferred_funding_speed: str = Form(None),
+):
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    errors = {}
+    if number_of_trucks > 1 and (not company_name or not company_name.strip()):
+        errors["company_name"] = "Company name is required for fleets (more than 1 truck)."
+    if errors:
+        prefill = _factoring_prefill(user)
+        prefill.update({
+            "full_name": full_name, "email": email, "cell_phone": cell_phone,
+            "secondary_phone": secondary_phone or "", "company_name": company_name or "",
+            "mc_number": mc_number, "number_of_trucks": number_of_trucks,
+        })
+        return templates.TemplateResponse(
+            "drivers/factoring_application.html",
+            {"request": request, "prefill": prefill, "errors": errors},
+        )
+    to_email = "alma@centuryfinance.com"
+    cc_email = os.getenv("FACTORING_CC_EMAIL") or os.getenv("CONTACT_RECIPIENT_EMAIL")
+    referral_data = {
+        "full_name": full_name.strip(),
+        "email": email.strip().lower(),
+        "cell_phone": cell_phone.strip(),
+        "secondary_phone": secondary_phone.strip() if secondary_phone else None,
+        "company_name": company_name.strip() if company_name else None,
+        "mc_number": mc_number.strip(),
+        "number_of_trucks": number_of_trucks,
+        "interested_fuel_card": bool(interested_fuel_card),
+        "estimated_monthly_volume": float(estimated_monthly_volume) if estimated_monthly_volume and estimated_monthly_volume.replace(",", "").replace(".", "").isdigit() else None,
+        "current_factoring_company": (current_factoring_company or "").strip() or None,
+        "preferred_funding_speed": (preferred_funding_speed or "").strip() or None,
+        "referral_code": "GREEN CANDLE",
+    }
+    result = send_factoring_referral_email(referral_data, to_email=to_email, cc_email=cc_email)
+    trucker_id = None
+    if engine:
+        try:
+            with engine.begin() as conn:
+                r = conn.execute(text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"), {"uid": user.get("id")})
+                trucker_id = r.scalar()
+            if trucker_id is not None:
+                with engine.begin() as conn:
+                    conn.execute(text("""
+                        INSERT INTO webwise.factoring_referrals
+                        (trucker_id, full_name, email, cell_phone, secondary_phone, company_name, driver_mc_number, number_of_trucks,
+                         interested_fuel_card, estimated_monthly_volume, current_factoring_company, preferred_funding_speed, referral_code, status)
+                        VALUES (:trucker_id, :full_name, :email, :cell_phone, :secondary_phone, :company_name, :mc_number, :number_of_trucks,
+                                :interested_fuel_card, :estimated_monthly_volume, :current_factoring_company, :preferred_funding_speed, 'GREEN CANDLE', 'PENDING')
+                    """), {
+                        "trucker_id": trucker_id,
+                        "full_name": referral_data["full_name"],
+                        "email": referral_data["email"],
+                        "cell_phone": referral_data["cell_phone"],
+                        "secondary_phone": referral_data["secondary_phone"],
+                        "company_name": referral_data["company_name"],
+                        "mc_number": referral_data["mc_number"],
+                        "number_of_trucks": referral_data["number_of_trucks"],
+                        "interested_fuel_card": referral_data["interested_fuel_card"],
+                        "estimated_monthly_volume": referral_data["estimated_monthly_volume"],
+                        "current_factoring_company": referral_data["current_factoring_company"],
+                        "preferred_funding_speed": referral_data["preferred_funding_speed"],
+                    })
+        except Exception:
+            pass
+    if result.get("status") == "success":
+        return templates.TemplateResponse(
+            "drivers/factoring_application.html",
+            {
+                "request": request,
+                "prefill": _factoring_prefill(user),
+                "success": True,
+                "message": "Thanks! Your info has been sent to Alma at Century Finance. She'll reach out personally within 1–2 business days to get you set up with the best rates. Mention you're from Green Candle Dispatch.",
+            },
+        )
+    return templates.TemplateResponse(
+        "drivers/factoring_application.html",
+        {"request": request, "prefill": _factoring_prefill(user), "error": result.get("message", "Failed to send. Please try again or contact us.")},
+    )
 
 
 @router.get("/drivers/active-load", response_class=HTMLResponse)

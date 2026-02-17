@@ -1,7 +1,13 @@
 <div class="space-y-6" id="onboarding-container">
     <div class="p-6 bg-slate-900/50 border border-slate-800 rounded-2xl">
-        <h2 class="text-lg font-bold text-white mb-2">Step 3: Small Fleet Setup</h2>
-        <p class="text-slate-400 text-sm">Select the number of trucks in your fleet. Setup is $25 per truck and includes $CANDLE credits for AI dispatch automation.</p>
+        <h2 class="text-lg font-bold text-white mb-2">Step 3: Account Setup & Funding</h2>
+        <p class="text-slate-400 text-sm mb-3">Select the number of trucks in your fleet. Setup is $25 per truck and includes $CANDLE credits for AI dispatch automation.</p>
+        <div class="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 mt-4">
+            <p class="text-xs text-blue-200 font-semibold mb-2">📋 Next Step After Payment:</p>
+            <p class="text-xs text-blue-100">After payment, you'll submit a quick form to our factoring partner <strong>Century Finance</strong> for same-day funding approval. Alma will personally review your application (usually 1–2 business days).</p>
+            <p class="text-xs text-blue-200 mt-2"><strong>If approved:</strong> Your full dashboard unlocks automatically.</p>
+            <p class="text-xs text-blue-200"><strong>If declined:</strong> Full refund of your $25 setup fee (processed within 3–5 business days).</p>
+        </div>
     </div>
     <div class="bg-slate-900 border-2 border-dashed border-slate-700 rounded-2xl p-6">
         <div class="flex items-center justify-center gap-2 mb-6">
@@ -39,6 +45,13 @@
             </div>
             {% endif %}
 
+            <div class="mt-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                <label class="flex items-start gap-2 cursor-pointer text-xs text-slate-300">
+                    <input type="checkbox" id="agree-refund" class="mt-0.5 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500" required />
+                    <span>I understand the $25 setup fee is refundable if Century Finance declines my funding application. By proceeding, I agree to submit my information to Century Finance for approval.</span>
+                </label>
+            </div>
+
             <div class="flex justify-center gap-3 mt-6">
                 <button type="button" id="btn-proceed"
                         class="bg-green-600 hover:bg-green-500 text-white text-sm font-bold py-3 px-8 rounded-full transition active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -68,8 +81,23 @@
     select.addEventListener('change', updateDisplay);
     updateDisplay();
 
+    var agreeCheckbox = document.getElementById('agree-refund');
+    function updateButtonState() {
+        if (btn && agreeCheckbox) {
+            btn.disabled = !agreeCheckbox.checked;
+        }
+    }
+    if (agreeCheckbox) {
+        agreeCheckbox.addEventListener('change', updateButtonState);
+        updateButtonState();
+    }
+
     if (btn) {
         btn.addEventListener('click', function() {
+            if (!agreeCheckbox || !agreeCheckbox.checked) {
+                alert('Please confirm you understand the refund policy before proceeding.');
+                return;
+            }
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Redirecting...';
             var truckCount = parseInt(select.value, 10) || 1;

@@ -57,6 +57,29 @@
         </div>
     </div>
 
+    <!-- Century Finance Status Banner -->
+    {% if century_status == 'PENDING' or century_status == 'CONTACTED' %}
+    <div class="px-4 mb-4">
+        <div class="bg-blue-900/40 border border-blue-500/50 rounded-xl p-4">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-clock text-blue-300"></i>
+                <h3 class="text-blue-200 font-bold text-sm">Waiting for Century Finance Approval</h3>
+            </div>
+            <p class="text-blue-100 text-xs">Alma should reach out within 1–2 business days. Check your email or contact her at <a href="mailto:alma@centuryfinance.com" class="underline">alma@centuryfinance.com</a>.</p>
+        </div>
+    </div>
+    {% elif century_status == 'DECLINED' %}
+    <div class="px-4 mb-4">
+        <div class="bg-red-900/40 border border-red-500/50 rounded-xl p-4">
+            <div class="flex items-center gap-2 mb-1">
+                <i class="fas fa-exclamation-circle text-red-300"></i>
+                <h3 class="text-red-200 font-bold text-sm">Funding Not Approved</h3>
+            </div>
+            <p class="text-red-100 text-xs">Your $25 setup fee refund has been processed. If you have questions, contact support.</p>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Welcome Fuel Banner (first login only) -->
     <div class="px-4" hx-get="/drivers/welcome-fuel-banner" hx-trigger="load" hx-swap="innerHTML">
         <!-- HTMX loads banner when is_first_login and balance > 0 -->
@@ -168,6 +191,19 @@
                 <!-- HTMX will populate this with load results -->
             </div>
         </div>
+    </div>
+
+    <div class="px-4 mb-6">
+        <h3 class="text-slate-500 text-xs uppercase mb-2 pl-1">Partner offers</h3>
+        <a href="/drivers/factoring-application" class="block bg-slate-900 rounded-xl border border-slate-800 p-4 hover:border-green-800 transition">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-file-invoice-dollar text-green-400 mr-2"></i>
+                <h3 class="text-green-100 text-sm font-bold">Premier Factoring Partner: Century Finance</h3>
+            </div>
+            <p class="text-[10px] text-slate-400 mb-2">Same-day funding on delivered loads, personalized rates, and great fuel card discounts. Alma will personally help you get set up.</p>
+            <p class="text-[9px] text-slate-500 mb-2">We may earn a referral fee — supports app improvements. No obligation.</p>
+            <span class="inline-block bg-green-600 hover:bg-green-500 text-white text-xs font-bold py-2 px-3 rounded-lg transition">Apply Now</span>
+        </a>
     </div>
 
     <div class="px-4">

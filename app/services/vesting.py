@@ -32,13 +32,14 @@ class VestingService:
                 if not mc_row or not mc_row[0]:
                     return 0.0
                 mc_number = mc_row[0]
-                # CREDITED/VESTED/LOCKED = positive. CONSUMED = negative. Sum = available.
+                # CREDITED = positive. CONSUMED = negative. Sum = available.
+                # LEGACY: VESTED/LOCKED statuses removed - credits are immediate-use only
                 result = conn.execute(
                     text("""
                         SELECT COALESCE(SUM(amount_candle), 0) as balance
                         FROM webwise.driver_savings_ledger
                         WHERE driver_mc_number = :mc
-                          AND status IN ('CREDITED', 'VESTED', 'LOCKED', 'CONSUMED')
+                          AND status IN ('CREDITED', 'CONSUMED')
                     """),
                     {"mc": mc_number}
                 ).fetchone()
@@ -76,7 +77,7 @@ class VestingService:
                             COALESCE(SUM(amount_candle), 0) as available_balance
                         FROM webwise.driver_savings_ledger
                         WHERE driver_mc_number = :mc
-                          AND status IN ('CREDITED', 'VESTED', 'LOCKED', 'CONSUMED')
+                          AND status IN ('CREDITED', 'CONSUMED')
                     """),
                     {"mc": mc_number}
                 ).fetchone()

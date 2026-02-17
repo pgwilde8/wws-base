@@ -164,3 +164,118 @@ Sent at {datetime.now().isoformat()}
         return {"status": "success", "sent_to": to_email}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def send_factoring_referral_email(referral_data: dict, to_email: str = "alma@centuryfinance.com", cc_email: Optional[str] = None) -> Dict:
+    """Send factoring referral form to Alma at Century Finance. Referral code: GREEN CANDLE."""
+    user = MX_USER or os.getenv("EMAIL_USER")
+    password = MX_PASS or os.getenv("EMAIL_PASS")
+    host = MX_HOST or os.getenv("EMAIL_HOST", "fusion.mxrouting.net")
+    port = MX_PORT or int(os.getenv("EMAIL_PORT", "465"))
+    if not user or not password:
+        return {"status": "error", "message": "SMTP credentials missing"}
+    from_email = os.getenv("FACTORING_FROM_EMAIL", f"referrals@{EMAIL_DOMAIN}")
+    mc = referral_data.get("mc_number", "N/A")
+    code = referral_data.get("referral_code", "GREEN CANDLE")
+    fuel = "Yes" if referral_data.get("interested_fuel_card") else "No"
+    body = f"""Hi Alma,
+
+New referral from Green Candle Dispatch (Referral Code: {code}).
+
+Driver Details:
+- Full Name: {referral_data.get('full_name', '')}
+- Email: {referral_data.get('email', '')}
+- Cell Phone: {referral_data.get('cell_phone', '')}
+- Secondary #: {referral_data.get('secondary_phone') or 'Not provided'}
+- Company Name: {referral_data.get('company_name') or 'Solo owner-operator'}
+- MC #: {mc}
+- Number of Trucks: {referral_data.get('number_of_trucks', '')}
+- Interested in Fuel Card Discounts: {fuel}
+- Est. Monthly Volume: {referral_data.get('estimated_monthly_volume') or 'Not specified'}
+- Current Factoring: {referral_data.get('current_factoring_company') or 'None'}
+- Preferred Funding: {referral_data.get('preferred_funding_speed') or 'Not specified'}
+
+Thanks!
+Green Candle Dispatch
+"""
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = f"Green Candle Dispatch <{from_email}>"
+        msg["To"] = to_email
+        if cc_email:
+            msg["Cc"] = cc_email
+        msg["Subject"] = f"New Green Candle Dispatch Referral - MC# {mc}"
+        msg["Reply-To"] = referral_data.get("email", from_email)
+        msg.attach(MIMEText(body, "plain"))
+        with smtplib.SMTP_SSL(host, port) as server:
+            server.login(user, password)
+            recipients = [to_email] + ([cc_email] if cc_email else [])
+            server.send_message(msg, to_addrs=recipients)
+        return {"status": "success", "sent_to": to_email}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def send_century_approval_email(driver_name: str, driver_email: str) -> Dict:
+    """Send congrats email when Century Finance approves driver."""
+    if not MX_USER or not MX_PASS:
+        return {"status": "error", "message": "SMTP credentials missing"}
+    from_email = os.getenv("FACTORING_FROM_EMAIL", f"referrals@{EMAIL_DOMAIN}")
+    body = f"""Hi {driver_name},
+
+Alma at Century Finance has approved and signed you up for funding.
+
+Your full Green Candle Dispatch dashboard is now unlocked — start scouting loads, negotiating rates, and automating your dispatch today!
+
+Log in here: https://greencandledispatch.com/drivers/dashboard
+
+If you have questions, reply here or reach Alma directly.
+
+Welcome aboard!
+Green Candle Dispatch
+"""
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = f"Green Candle Dispatch <{from_email}>"
+        msg["To"] = driver_email
+        msg["Subject"] = "Congrats! You're Approved with Century Finance – Dashboard Unlocked!"
+        msg["Reply-To"] = from_email
+        msg.attach(MIMEText(body, "plain"))
+        with smtplib.SMTP_SSL(MX_HOST, MX_PORT) as server:
+            server.login(MX_USER, MX_PASS)
+            server.send_message(msg, to_addrs=[driver_email])
+        return {"status": "success", "sent_to": driver_email}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def send_century_decline_email(driver_name: str, driver_email: str, refund_info: Optional[str] = None) -> Dict:
+    """Send decline email with refund info when Century Finance declines driver."""
+    if not MX_USER or not MX_PASS:
+        return {"status": "error", "message": "SMTP credentials missing"}
+    from_email = os.getenv("FACTORING_FROM_EMAIL", f"referrals@{EMAIL_DOMAIN}")
+    refund_text = refund_info or "We've processed your full $25 setup fee refund via Stripe (should appear in 3–10 business days). Check your Stripe receipt or bank statement."
+    body = f"""Hi {driver_name},
+
+Alma reviewed your info, but unfortunately funding approval didn't go through at this time.
+
+{refund_text}
+
+If you'd like to try again later or have questions, feel free to reply.
+
+Thanks for giving us a shot — we appreciate it.
+Green Candle Dispatch
+"""
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = f"Green Candle Dispatch <{from_email}>"
+        msg["To"] = driver_email
+        msg["Subject"] = "Update from Century Finance – Next Steps"
+        msg["Reply-To"] = from_email
+        msg.attach(MIMEText(body, "plain"))
+        with smtplib.SMTP_SSL(MX_HOST, MX_PORT) as server:
+            server.login(MX_USER, MX_PASS)
+            server.send_message(msg, to_addrs=[driver_email])
+        return {"status": "success", "sent_to": driver_email}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
