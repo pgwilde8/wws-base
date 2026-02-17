@@ -45,7 +45,7 @@
                 <div class="bg-slate-800/50 p-6 rounded-xl border border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.2)]">
                     <div class="text-sm uppercase text-green-400 font-bold tracking-wider mb-2">Driver Share</div>
                     <div class="text-4xl font-black text-white mb-2">75%</div>
-                    <p class="text-xs text-slate-400">Sent to your personal Savings Vault (Locked for 6 months).</p>
+                    <p class="text-xs text-slate-400">Instantly rebated as $CANDLE Fuel for your next run.</p>
                 </div>
 
                 <div class="hidden md:block text-slate-600 text-2xl">
@@ -60,38 +60,96 @@
             </div>
             
             <p class="text-center text-slate-400 text-sm mt-8 max-w-2xl mx-auto">
-                <strong>Why burn it?</strong> By destroying 25% of every fee, we make the tokens in your vault scarcer. It's a deflationary mechanism designed to reward long-term holders.
+                <strong>Why burn it?</strong> By destroying 25% of every fee, we make the fuel you earn today power a more efficient network tomorrow.
             </p>
         </div>
     </section>
 
-    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col md:flex-row gap-8 items-center">
-        <div class="flex-1">
-            <h2 class="text-2xl font-bold text-white mb-4 flex items-center">
-                <span class="mr-3">🔐</span> The 6-Month Rolling Lock
-            </h2>
-            <p class="text-slate-300 mb-4">
-                To ensure network stability, all driver rewards are locked for <strong>180 days</strong> from the moment they are earned.
-            </p>
-            <ul class="space-y-2 text-sm text-slate-400">
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Prevents "dumping" and protects price.</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Creates a "forced savings" retirement fund.</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Starts a weekly income stream after Month 6.</li>
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-8">
+        <h2 class="text-2xl font-bold text-white mb-6 flex items-center">
+            <span class="mr-3">⚡</span> Automation Fuel – How $CANDLE Governs Your Fleet
+        </h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-slate-700">
+                        <th class="py-4 pr-4 text-slate-300 font-semibold">Automation Action</th>
+                        <th class="py-4 pr-4 text-slate-300 font-semibold">$CANDLE Cost</th>
+                        <th class="py-4 text-slate-300 font-semibold">Platform Value</th>
+                    </tr>
+                </thead>
+                <tbody class="text-slate-300">
+                    <tr class="border-b border-slate-800">
+                        <td class="py-4 pr-4 font-medium text-white">Intelligent Load Scanning</td>
+                        <td class="py-4 pr-4 text-green-400 font-mono">FREE</td>
+                        <td class="py-4 text-slate-400">Basic market visibility.</td>
+                    </tr>
+                    <tr class="border-b border-slate-800">
+                        <td class="py-4 pr-4 font-medium text-white">Advanced Lane Filtering</td>
+                        <td class="py-4 pr-4 text-green-400 font-mono">1.0 / day</td>
+                        <td class="py-4 text-slate-400">Priority ranking of high-paying loads.</td>
+                    </tr>
+                    <tr class="border-b border-slate-800">
+                        <td class="py-4 pr-4 font-medium text-white">Sarah/Marcus Negotiation</td>
+                        <td class="py-4 pr-4 text-green-400 font-mono">0.5 / bid</td>
+                        <td class="py-4 text-slate-400">AI-driven counter-offers to brokers.</td>
+                    </tr>
+                    <tr class="border-b border-slate-800">
+                        <td class="py-4 pr-4 font-medium text-white">Auto-Packet Submission</td>
+                        <td class="py-4 pr-4 text-green-400 font-mono">1.0 / pack</td>
+                        <td class="py-4 text-slate-400">One-click W-9, insurance, and NOA delivery.</td>
+                    </tr>
+                    <tr class="border-b border-slate-800">
+                        <td class="py-4 pr-4 font-medium text-white">Autonomous Dispatch Mode</td>
+                        <td class="py-4 pr-4 text-green-400 font-mono">5.0 / load</td>
+                        <td class="py-4 text-slate-400">End-to-end booking while you drive.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-6">
+            <a href="{{ candle_dex_url|default('https://app.uniswap.org/swap?chain=base') }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-slate-900 font-bold px-6 py-3 rounded-xl transition">
+                Get More Fuel on Base
+            </a>
+        </div>
+    </section>
+
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-8 space-y-8">
+        <h2 class="text-2xl font-bold text-white flex items-center">
+            <span class="mr-3">🛢️</span> Fueling Your Fleet
+        </h2>
+
+        <div>
+            <h3 class="text-lg font-semibold text-green-400 mb-3">How to Acquire Fuel</h3>
+            <ul class="space-y-3 text-slate-300">
+                <li class="flex items-start gap-3">
+                    <span class="text-green-500 mt-0.5">•</span>
+                    <span><strong class="text-white">Earned Rebates:</strong> Every successful load factors in a 2% network fee. We instantly rebate <strong>75%</strong> of that fee back to your account as $CANDLE Fuel for your next run.</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="text-green-500 mt-0.5">•</span>
+                    <span><strong class="text-white">External Acquisition:</strong> Need to jumpstart a new rig? You can acquire $CANDLE on the <strong class="text-blue-400">Base Network</strong> via supported exchanges to instantly unlock Sarah and Marcus's full negotiation suite.</span>
+                </li>
             </ul>
         </div>
-        <div class="bg-slate-950 p-6 rounded-xl border border-slate-800 w-full md:w-auto min-w-[300px]">
-            <div class="flex justify-between text-sm mb-2 border-b border-slate-800 pb-2">
-                <span class="text-slate-500">Status</span>
-                <span class="text-white">Amount</span>
-            </div>
-            <div class="flex justify-between text-sm mb-2">
-                <span class="text-orange-400"><i class="fas fa-lock text-xs mr-1"></i> Locked</span>
-                <span class="text-white font-mono">15,420 $CANDLE</span>
-            </div>
-            <div class="flex justify-between text-sm">
-                <span class="text-green-400"><i class="fas fa-lock-open text-xs mr-1"></i> Vested</span>
-                <span class="text-white font-mono">2,500 $CANDLE</span>
-            </div>
+
+        <div>
+            <h3 class="text-lg font-semibold text-orange-400 mb-3">Why the Burn Matters</h3>
+            <ul class="space-y-2 text-slate-300">
+                <li class="flex items-start gap-3">
+                    <span class="text-orange-500 mt-0.5">•</span>
+                    <span>We don't just move tokens; we make the network stronger. <strong>25%</strong> of every network fee is permanently destroyed (Burned).</span>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="text-orange-500 mt-0.5">•</span>
+                    <span>This deflationary mechanism reduces the total supply, ensuring that the fuel you earn today powers a more efficient network tomorrow.</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
+            <h3 class="text-lg font-semibold text-white mb-2">The One Billion Cap</h3>
+            <p class="text-slate-300">To keep things professional and clear for drivers, we maintain a hard cap of <strong class="text-green-400">1,000,000,000 $CANDLE</strong>. This allows the fuel to have a unit price that looks like a real currency—making it easy to track your tank balance at a glance.</p>
         </div>
     </section>
 
@@ -99,7 +157,7 @@
         <div class="relative z-10">
             <h2 class="text-3xl font-bold text-white mb-6">The Goal: The Green Candle Card</h2>
             <p class="text-slate-300 mb-8 max-w-xl">
-                The 6-month wait is worth it. Once your tokens unlock, we make spending them as easy as swiping at the pump.
+                Use your Available Fuel to power AI negotiations, or load it onto the Green Candle Debit Card and spend it as easily as swiping at the pump.
             </p>
             
             <div class="grid sm:grid-cols-2 gap-4 max-w-2xl">

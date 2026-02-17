@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+email-validator
 sqlalchemy
 psycopg2-binary
 python-dotenv

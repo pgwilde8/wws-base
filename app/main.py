@@ -22,7 +22,20 @@ if not os.getenv("DATABASE_URL"):
                 os.environ["DATABASE_URL"] = line.split("=", 1)[1].strip().strip('"').strip("'")
                 break
 
-from app.routes import public_router, auth_router, admin_router, client_router, legal_router, ingest_router, api_router
+from app.routes import (
+    public_router,
+    auth_router,
+    beta_apply_router,
+    admin_router,
+    admin_burn_router,
+    admin_beta_router,
+    client_router,
+    legal_router,
+    ingest_router,
+    api_router,
+    ops_treasury_router,
+    webhooks_router,
+)
 from app.core.deps import templates
 
 app = FastAPI(title="Green Candle Dispatch")
@@ -69,11 +82,16 @@ app.mount("/static", StaticFiles(directory=str(_BASE_DIR / "static")), name="sta
 
 app.include_router(public_router)
 app.include_router(auth_router)
+app.include_router(beta_apply_router)
 app.include_router(admin_router)
+app.include_router(admin_burn_router)
+app.include_router(admin_beta_router)
 app.include_router(client_router)
 app.include_router(legal_router)
 app.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"])
 app.include_router(api_router)  # Scout heartbeat, etc.
+app.include_router(ops_treasury_router)
+app.include_router(webhooks_router, prefix="/webhooks")
 
 
 @app.get("/test-error/{code}")

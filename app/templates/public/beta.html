@@ -1,0 +1,94 @@
+{% extends "layout/base.html" %}
+{% block content %}
+<section class="max-w-5xl mx-auto px-4 py-16 space-y-12">
+
+  <header class="text-center space-y-4">
+    <p class="text-sm uppercase tracking-[0.3em] text-green-400 font-bold">Beta Program</p>
+    <h1 class="text-4xl sm:text-5xl font-black text-white">
+      AI Dispatch that only gets paid <span class="text-green-400">after you get paid</span>.
+    </h1>
+    <p class="text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed">
+      Join the Green Candle Beta Family. $0 to join. Setup fee waived. We’ll help you book your first load.
+      You’ll get login credentials within 24 hours.
+    </p>
+
+    <div class="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+      <a href="/beta/apply"
+         class="inline-block bg-green-500 hover:bg-green-400 text-slate-900 font-bold px-8 py-4 rounded-xl transition shadow-lg shadow-green-900/20">
+        Apply for Beta
+      </a>
+      <a href="/login"
+         class="inline-block border border-slate-700 hover:border-green-500/40 text-white font-bold px-8 py-4 rounded-xl transition">
+        I already have login
+      </a>
+    </div>
+
+    <p class="text-slate-500 text-sm pt-2">
+      No credit card. No subscription. We earn 2% only when your factoring funds you.
+    </p>
+  </header>
+
+  <section class="grid md:grid-cols-3 gap-6">
+    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
+      <h3 class="text-white font-bold mb-2">Scout Loads</h3>
+      <p class="text-slate-400 text-sm">Set your lanes and minimum rate. We scan and surface matches fast. Green Candle monitors load boards and alerts you immediately when a matching load appears, helping you respond faster.</p>
+    </div>
+    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
+      <h3 class="text-white font-bold mb-2">Negotiate Faster</h3>
+      <p class="text-slate-400 text-sm">Professional broker emails and counter offers so you stop chasing.</p>
+    </div>
+    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
+      <h3 class="text-white font-bold mb-2">Settlement Ledger</h3>
+      <p class="text-slate-400 text-sm">A timeline of every load, fee, and funding event — like a bank statement.</p>
+    </div>
+  </section>
+
+  <section class="bg-slate-900 border border-slate-800 rounded-2xl p-8 space-y-4">
+    <h2 class="text-xl font-bold text-white">What we need to approve you</h2>
+    <ul class="text-slate-300 text-sm space-y-2 list-disc pl-5">
+      <li>MC number</li>
+      <li>Phone + email</li>
+      <li>Preferred lanes</li>
+      <li>Factoring company (if you already use one)</li>
+    </ul>
+    <p class="text-slate-400 text-sm">
+      After you apply, we’ll approve you and send login credentials within 24 hours.
+    </p>
+  </section>
+
+  <section class="grid md:grid-cols-2 gap-6">
+    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
+      <h3 class="text-white font-bold mb-2">FAQ</h3>
+      <div class="space-y-3 text-sm text-slate-300">
+        <div>
+          <p class="font-bold text-white">Do I need a credit card?</p>
+          <p class="text-slate-400">No. Beta is free.</p>
+        </div>
+        <div>
+          <p class="font-bold text-white">Do I need to switch factoring?</p>
+          <p class="text-slate-400">No. We work with your existing setup.</p>
+        </div>
+        <div>
+          <p class="font-bold text-white">How do you get paid?</p>
+          <p class="text-slate-400">A flat 2% only after you get funded. No 10% dispatch cut.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-gradient-to-br from-slate-900 to-slate-950 border-2 border-green-500/40 rounded-2xl p-6">
+      <h3 class="text-white font-bold mb-2">Limited beta spots</h3>
+      <p class="text-slate-400 text-sm mb-4">
+        We’re starting with NJ-area owner-operators and small fleets so we can give hands-on support.
+      </p>
+      <a href="/beta/apply"
+         class="inline-block w-full text-center bg-green-500 hover:bg-green-400 text-slate-900 font-bold px-8 py-4 rounded-xl transition">
+        Apply for Beta
+      </a>
+      <p class="text-slate-500 text-xs mt-3 text-center">
+        Expect approval + login credentials within 24 hours.
+      </p>
+    </div>
+  </section>
+
+</section>
+{% endblock %}

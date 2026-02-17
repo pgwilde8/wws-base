@@ -1,8 +1,13 @@
-Green Candle Dispatch (GCD) — Revenue Model and System Economics
-Prepared by: Green Candle Dispatch
+# Green Candle Dispatch (GCD) — Revenue Model and System Economics
+
+> **Note:** For the **2% dispatch fee, allocation, and driver CANDLE credits**, the **single source of truth** is **[rev.md](./rev.md)**. That doc has one canonical allocation table and matches the running code (`app/services/ledger.py`). This file is an earlier version with overlapping (and in places conflicting) content; use it for scaling scenarios and product narrative only, and rely on rev.md for fee splits and dashboard numbers.
+
+---
+
+Prepared by: Green Candle Dispatch  
 Entity: Webwise Systems Inc. (Delaware C-Corp)
 
-Executive Summary
+## Executive Summary
 Green Candle Dispatch is an autonomous AI dispatch infrastructure platform that replaces traditional human dispatchers with software agents.
 The platform earns revenue primarily from a 2% dispatch service fee collected through factoring partners, supplemented by factoring partner referral revenue, call service products, and optional premium automation services.
 A portion of dispatch fee revenue is optionally issued back to drivers as internal service credits denominated in CANDLE, which are used exclusively within the platform to access automation features.

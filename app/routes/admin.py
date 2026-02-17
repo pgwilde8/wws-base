@@ -5,6 +5,7 @@ import logging
 
 from app.core.deps import templates, engine, require_admin, get_db
 from app.services.payments import RevenueService
+from app.services.beta_activation import update_beta_activity, STAGE_FIRST_LOAD_WON
 from app.services.referral import ReferralService
 from app.services.email import send_negotiation_email, parse_broker_reply
 from app.services.buyback_notifications import BuybackNotificationService
@@ -135,6 +136,8 @@ async def mark_negotiation_won(negotiation_id: int, body: dict = Body(...)):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Negotiation not found")
         
         negotiation_id_db, trucker_id, origin, destination, load_id = row
+        if trucker_id:
+            update_beta_activity(engine, trucker_id=trucker_id, new_stage=STAGE_FIRST_LOAD_WON)
         
         # Get trucker info and reward tier for dynamic buyback calculation
         trucker_name = None
@@ -222,6 +225,26 @@ async def mark_negotiation_won(negotiation_id: int, body: dict = Body(...)):
                         )
                         
                         logger.info(f"🎯 FINDERS FEE: Credited ${finders_fee_usd} to discoverer trucker_id={discoverer_id} for load {load_id}")
+    
+    # Platform treasury: record dispatch fee revenue (burn-eligible)
+    from decimal import Decimal
+    from app.services.burn import record_revenue
+    from app.models.treasury import RevenueSourceType
+
+    platform_fee = (Decimal(str(final_rate)) * Decimal("0.02")).quantize(Decimal("0.01"))
+    if platform_fee > 0 and engine:
+        try:
+            record_revenue(
+                engine,
+                source_type=RevenueSourceType.DISPATCH_FEE,
+                gross_amount_usd=platform_fee,
+                source_ref=f"dispatch-{negotiation_id}",
+                load_id=str(load_id) if load_id else None,
+                driver_mc_number=mc_number,
+                burn_eligible=False,  # true only after factoring settlement (confirm_dispatch_settlement)
+            )
+        except Exception as e:
+            logger.warning("platform_revenue_ledger insert failed (idempotent?): %s", e)
     
     # Calculate buyback based on reward tier (use same calculation as above)
     from app.services.reward_tier import RewardTierService

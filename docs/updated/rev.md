@@ -1,60 +1,69 @@
-Green Candle Dispatch (GCD) — Revenue 
-Model and System Economics 
-Prepared by: Green Candle Dispatch 
-Entity: Webwise Systems Inc. (Delaware C-Corp) 
-Executive Summary 
-Green Candle Dispatch is an autonomous AI dispatch infrastructure platform that replaces 
-traditional human dispatchers with software agents. 
-The platform earns revenue primarily from a 2% dispatch service fee collected through 
-factoring partners, supplemented by factoring partner referral revenue, call service products, 
-and optional premium automation services. 
-A portion of dispatch fee revenue is optionally issued back to drivers as internal service credits 
-denominated in CANDLE, which are used exclusively within the platform to access automation 
-features. 
-This model aligns platform sustainability, driver success, and system growth. 
-Primary Revenue Stream: 2% Dispatch 
-Service Fee 
-Green Candle Dispatch earns a flat 2% dispatch service fee only after a driver successfully 
-completes a load and receives payment through a factoring partner. 
-Example Load: 
-Broker pays: $1,900 
-Factoring company fee (3%): $57 
-Green Candle Dispatch fee (2%): $38 
-Driver receives: $1,805 
-The platform earns revenue only from successful outcomes. 
-There are no upfront dispatch fees and no monthly subscription required for core dispatch 
-automation. 
-Dispatch Fee Allocation Model 
-Each dispatch fee is allocated to support system operation, sustainability, and driver automation 
-access. 
-Example: $38 Dispatch Fee Allocation 
-$15 → Infrastructure Costs 
-• AI processing (OpenAI services where applicable) 
-• Server hosting and backend infrastructure 
-• Email automation infrastructure 
-• Data storage and system monitoring 
-$10 → Platform Operating Margin 
-• Company operating revenue 
-• Development and engineering 
-• Customer support 
-• Business operations 
-$13 → Internal Service Credit Issuance (CANDLE Credits) 
-• Issued to driver internal account ledger 
-• Used exclusively to access dispatch automation features 
-• Non-transferable, service-based utility credits 
-Driver Dashboard Representation 
-Drivers see transparent dispatch economics inside the platform dashboard. 
-Example Driver Dashboard Entry: 
-Load completed: $1,900 
-Dispatch fee: $38 
-Service credits issued: 13 CANDLE 
-These credits can be used to: 
-• Run automated dispatch agents 
-• Initiate broker negotiation automation 
-• Access advanced automation features 
-• Enable premium automation workflows 
-Credits represent internal service access, not external payments. 
-Factoring Partner Referral Revenue 
+# Green Candle Dispatch — Revenue Model and System Economics
+
+**Entity:** Webwise Systems Inc. (Delaware C-Corp)  
+**Single source of truth for:** 2% dispatch fee, allocation, driver credits, and related revenue.
+
+---
+
+## Source of truth: 2% dispatch fee and allocation
+
+**Use this section as the one canonical reference.** Code lives in `app/services/ledger.py`; these numbers match the running system.
+
+### When the fee is earned
+
+- Platform earns a **flat 2% dispatch service fee** only after a load is successfully completed and the driver is paid (through factoring).
+- No upfront dispatch fees; no monthly subscription for core dispatch automation.
+
+### Example per load ($1,900)
+
+| Step | Amount |
+|------|--------|
+| Broker pays | $1,900 |
+| Factoring company (3%) | $57 |
+| **Green Candle Dispatch (2%)** | **$38** |
+| Driver receives | $1,805 |
+
+### Allocation of the 2% fee (100% of the $38)
+
+Every dollar of the 2% fee is split as follows. **This is what the running system implements** (see `app/services/ledger.py`).
+
+| Slice | % of fee | Purpose | In code | Example on $38 fee |
+|-------|----------|---------|---------|---------------------|
+| **Driver service credits (CANDLE)** | **21.05%** | Internal credits for automation (1:1 USD → CANDLE) | `DRIVER_REBATE_RATIO` | **~$8 → 8 CANDLE** |
+| AI / infra reserve | 21.05% | AI, hosting, email, data | `AI_RESERVE_RATIO` | ~$8 |
+| Platform profit | 31.58% | Operating revenue, product, support | `PLATFORM_PROFIT_RATIO` | ~$12 |
+| Treasury | 26.32% | $CANDLE backing / burn reserve | `TREASURY_RATIO` | ~$10 |
+
+**Check:** 21.05 + 21.05 + 31.58 + 26.32 = **100%**.
+
+### When the driver sees credits
+
+- Credits are written to **driver_savings_ledger** when the driver **uploads BOL** for that load (`process_load_settlement` in `app/services/ledger.py`), not at “mark-won.”
+- Dashboard shows **amount_candle** (1:1 with the USD credit for that slice).
+- So for a $1,900 load: **driver sees ~8 CANDLE** (not 13). Credits are used only for in-platform automation (agents, negotiation, features); non-transferable utility.
+
+### Optional: alternative “target” allocation (not in code)
+
+If you later want the **driver slice to be $13 → 13 CANDLE** (e.g. for marketing or product copy), set the driver rebate to **13/38 ≈ 34.2%** of the fee in `ledger.py` (`DRIVER_REBATE_RATIO`) and adjust the other three ratios so the four still sum to 100%.
+
+---
+
+## Other revenue streams (unchanged)
+
+- **Factoring partner referral:** 0.25%–0.75% of invoice (e.g. 0.35% = $6.65 on $1,900); separate from the 2% fee.
+- **Call products (Twilio):** Sold separately (e.g. call packs); not included in the 2% fee.
+- **Premium automation / fuel packs, broker subscriptions:** Optional products; see Stripe catalog section below.
+
+---
+
+## Executive summary (for decks)
+
+Green Candle Dispatch is an autonomous AI dispatch platform. Revenue is primarily from a **2% dispatch service fee** (collected via factoring), plus factoring referral, call products, and optional automation/broker products. A portion of the 2% fee is issued back to drivers as **internal CANDLE credits** (currently 21.05% of the fee → ~8 CANDLE per $38 fee); credits are for in-platform automation only. This aligns platform sustainability, driver success, and system growth.
+
+---
+
+## Factoring Partner Referral Revenue
+
 Green Candle Dispatch receives additional referral revenue from factoring partners. 
 Typical factoring partner referral revenue ranges from: 
 0.25% to 0.75% of invoice value 
@@ -64,15 +73,19 @@ Partner referral fee (0.35%): $6.65 additional revenue
 This revenue is separate from the 2% dispatch service fee. 
 Drivers who already use one factoring partner may be offered alternative approved partners to 
 maximize service compatibility and platform integration efficiency. 
-This allows Green Candle Dispatch to capture referral revenue while improving automation 
-reliability. 
-Call Automation Revenue (Twilio Call 
-Products) 
+This allows Green Candle Dispatch to capture referral revenue while improving automation reliability.
+
+---
+
+## Call Automation Revenue (Twilio Call Products) 
 Broker communication often requires phone calls, which incur direct telecommunications costs. 
 Green Candle Dispatch provides call capability through prepaid call service products. 
 Call automation is not included in the base 2% dispatch service. 
-Drivers purchase call packages as 
-=========== 
+Drivers purchase call packages (see Stripe catalog later in this doc).
+
+**For 2% fee allocation, use the Source of truth section at the top.**
+
+--- 
 You’re now at the point where you need to see actual revenue math per load, per driver, and 
 per month so you know exactly what Green Candle can generate. I’ll break it down realistically 
 using your real flows. 
@@ -81,19 +94,10 @@ We’ll calculate:
 ● revenue per driver per month 
 ● revenue at scale (100, 500, 1,000 drivers) 
 ● plus additional streams (factor partner, Twilio packs, broker DB, etc.) 
-Core revenue stream: 2% dispatch fee 
-from factoring 
-Example load value: $1,900 
-Factor takes 3%: $57 
-You receive 2%: $38 
-This is your primary revenue engine. 
-Now split that $38 realistically: 
-Example internal allocation: 
-● $12 → platform profit 
-● $10 → treasury ($CANDLE backing) 
-● $8 → AI infrastructure reserve 
-● $8 → driver service credits (internal CANDLE credits) 
-You still net $12 real profit per load immediately, plus treasury growth. 
+Core revenue stream: 2% dispatch fee from factoring.  
+Example load value: $1,900 → Factor 3%: $57 → You receive 2%: **$38**. This is your primary revenue engine.
+
+**Allocation of the $38:** See **Source of truth** at the top of this doc. In the running system: ~$12 platform profit, ~$10 treasury, ~$8 AI reserve, ~$8 driver credits (8 CANDLE). You net ~$12 profit per load plus treasury growth. 
 Now calculate real driver behavior 
 Realistic average owner-operator: 
 ● 12–20 loads per month 
@@ -306,3 +310,95 @@ If you tell me roughly:
 ● your expected average call minutes per booked load (2? 5? 10?) 
 ● and how often brokers demand calls vs email (like 30%? 60%?) 
 …I’ll propose exact pack pricing + CANDLE action pricing so your margins stay strong. 
+===========
+
+From **rev.md**, **burn.md**, and the current **pricing.html**, here’s a product catalog and what you’d create in Stripe.
+
+---
+
+## GCD Stripe Product Catalog
+
+### Current (live on Stripe)
+
+| Product | Price | Type | Notes |
+|--------|-------|------|-------|
+| **Small Fleet Setup** | $25/truck | One-time | 1–5 trucks. Uses `price_data` at checkout (no product in Stripe Dashboard). |
+
+---
+
+### Needed (from rev.md)
+
+| # | Product | Suggested Price | Type | Revenue Stream | Burn Eligible |
+|---|---------|-----------------|------|----------------|---------------|
+| **1** | **Call Pack – Starter** | $49 | One-time | Twilio call minutes | Yes |
+| **2** | **Call Pack – Pro** | $99 | One-time or recurring | Twilio call minutes | Yes |
+| **3** | **Call Pack – Fleet** | $199 | One-time or recurring | Twilio call minutes | Yes |
+| **4** | **Automation Fuel Pack – Starter** | ~$25–50 | One-time | Extra $CANDLE credits | Yes |
+| **5** | **Automation Fuel Pack – Fleet** | ~$100–150 | One-time | Extra $CANDLE credits | Yes |
+| **6** | **Broker Subscription** | $99–$299/mo | Recurring | Broker priority / directory access | Yes |
+
+---
+
+### Optional / future
+
+| Product | Price | Notes |
+|---------|-------|-------|
+| Broker directory access | $49–$199/mo | Different from broker subscription |
+| Broker verification report | $5 / broker | Per-report |
+| Automation credits (monthly) | ~$50/mo | Monthly top-up |
+
+---
+
+## Rev.md numbers vs products
+
+| Rev stream | Source | Stripe product |
+|------------|--------|----------------|
+| Dispatch fee margin | Factoring | Not in Stripe (factoring) |
+| Call pack profit | Twilio | Call Packs 1–3 |
+| Automation purchases | Drivers buy extra credits | Fuel Packs 4–5 |
+| Factoring referral | Factoring partner | Not in Stripe |
+| Broker subscription | Brokers | Product 6 |
+
+---
+
+## Product list for Stripe setup
+
+Create these in Stripe (Products + Prices):
+
+1. **Small Fleet Setup** – already in use via `price_data` (can mirror as a product for reporting)
+2. **Call Pack – 120 min** – $49
+3. **Call Pack – 300 min** – $99
+4. **Call Pack – 750 min** – $199
+5. **Fuel Pack – Starter** (e.g. 10 $CANDLE) – TBD
+6. **Fuel Pack – Fleet** (e.g. 60 $CANDLE) – TBD
+7. **Broker Subscription** – $149/mo (or tiered)
+
+---
+
+## How this could map to pages
+
+- **Primary pricing page** (`/pricing`):  
+  - Small Fleet Setup as main CTA  
+  - Short summary of “add-ons” (call packs, fuel packs) with links
+
+- **Secondary services/products page** (e.g. `/services/pricing` or `/products`):  
+  - Full product catalog  
+  - Call packs, fuel packs, broker subscription with prices and CTAs
+
+---
+
+## Open choices
+
+1. Call pack pricing: rev.md mentions $49/120, $99/300, $199/750. Confirm these.
+2. Fuel pack pricing: `buy_fuel` mentions 10 vs 60 $CANDLE. Do you want a fixed USD price (e.g. $1/CANDLE) or variable?
+3. Broker subscription: include at launch or later?
+4. Call packs: one-time purchase or recurring subscription?
+
+Want to narrow this to a minimal first set (e.g. Small Fleet + 1–2 call packs + 1 fuel pack) before you build the Stripe products and pages?
+
+Call Pack – 120 min – $49= prod_TzVhUguxTHic75, price_1T1Wg2RoeA6UINeR1IGbLNEW
+Call Pack – 300 min – $99=prod_TzVirBazpghaHG, price_1T1WhLRoeA6UINeR0qRIojxF
+Call Pack – 750 min – $199=prod_TzVjeSmqO34zi6, price_1T1WiMRoeA6UINeRUIpagpR6
+Fuel Pack – Starter (e.g. 10 $CANDLE) – TBD=prod_TzVme0pF6B6PUU, price_1T1WlIRoeA6UINeRIjEmRE2b
+Fuel Pack – Fleet (e.g. 60 $CANDLE) – TBD=prod_TzVnXd5W7tIdMb, price_1T1Wm9RoeA6UINeREChn3oth
+Broker Subscription – $149/mo=prod_TzVp8mtHTPAfY8, price_1T1WngRoeA6UINeRxIZFB9m6

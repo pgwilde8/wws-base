@@ -6,6 +6,7 @@ from typing import Optional
 
 from app.schemas.scout import ScoutUpdate
 from app.core.deps import engine
+from app.services.beta_activation import update_beta_activity, STAGE_FIRST_SCOUT
 from sqlalchemy import text
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -62,6 +63,7 @@ async def scout_heartbeat(
                     "active": payload.active,
                 },
             )
+        update_beta_activity(engine, trucker_id=trucker_id, new_stage=STAGE_FIRST_SCOUT)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

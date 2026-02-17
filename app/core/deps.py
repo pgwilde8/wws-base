@@ -29,6 +29,13 @@ ASSISTANT_ID = os.getenv("ASSISTANT_ID")
 
 engine = create_engine(DATABASE_URL, echo=False, future=True) if DATABASE_URL else None
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine) if engine else None
+
+
+def get_engine():
+    """Dependency: returns the app engine for treasury/burn and webhooks."""
+    if not engine:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database not configured")
+    return engine
 openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 templates = Jinja2Templates(directory=str(_BASE_DIR / "templates"))
 

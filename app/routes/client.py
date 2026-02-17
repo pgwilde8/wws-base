@@ -10,6 +10,8 @@ from datetime import datetime
 from sqlalchemy.exc import ProgrammingError
 
 from app.core.deps import templates, current_user, engine, get_db
+from app.core.deps_trucker import driver_can_skip_payment, is_beta_driver
+from app.services.beta_activation import update_beta_activity, STAGE_LOGGED_IN, STAGE_FIRST_LOAD_WON
 from app.services.ai_agent import AIAgentService
 from app.services.negotiation import save_negotiation
 from app.services.payments import RevenueService
@@ -39,7 +41,7 @@ def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_us
         with engine.begin() as conn:
             row = conn.execute(
                 text("""
-                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.scout_api_key
+                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.scout_api_key, COALESCE(tp.is_beta, false) AS is_beta
                     FROM webwise.trucker_profiles tp
                     WHERE tp.user_id = :uid
                 """),
@@ -49,12 +51,16 @@ def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_us
         with engine.begin() as conn:
             row = conn.execute(
                 text("""
-                    SELECT tp.id, tp.display_name, tp.mc_number, NULL, tp.scout_api_key
+                    SELECT tp.id, tp.display_name, tp.mc_number, NULL, tp.scout_api_key, false AS is_beta
                     FROM webwise.trucker_profiles tp
                     WHERE tp.user_id = :uid
                 """),
                 {"uid": user.get("id")},
             ).first()
+    # Beta activation: first dashboard load -> LOGGED_IN
+    profile_for_beta = {"is_beta": getattr(row, "is_beta", False) if row else False}
+    if is_beta_driver(profile_for_beta):
+        update_beta_activity(engine, user_id=user.get("id"), new_stage=STAGE_LOGGED_IN)
     # GATEKEEPER: redirect incomplete profiles to onboarding
     has_display_name = row and (row[1] or "").strip()
     mc_val = (row[2] or "").strip() if row and len(row) > 2 else ""
@@ -69,6 +75,7 @@ def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_us
     elif api_key_raw:
         api_key_display = api_key_raw[:4] + "..."
     trucker = {"id": row[0], "display_name": row[1] or "Driver", "mc_number": mc_val or dot_val or "—"}
+    show_beta_banner = is_beta_driver(profile_for_beta)
     balance = VestingService.get_claimable_balance(engine, trucker["id"])
     balance_val = balance or 0
     # First Mission tutorial: exactly starter balance (10 or 50 $CANDLE) and zero negotiations
@@ -88,6 +95,7 @@ def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_us
             "balance": balance_val,
             "is_new_driver": is_new_driver,
             "scout_api_key_display": api_key_display,
+            "show_beta_banner": show_beta_banner,
         },
     )
 
@@ -879,7 +887,7 @@ def dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_u
         with engine.begin() as conn:
             row = conn.execute(
                 text("""
-                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, tp.is_first_login
+                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, tp.is_first_login, COALESCE(tp.is_beta, false) AS is_beta
                     FROM webwise.trucker_profiles tp
                     WHERE tp.user_id = :uid
                 """),
@@ -889,13 +897,14 @@ def dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_u
         with engine.begin() as conn:
             row = conn.execute(
                 text("""
-                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, false
+                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, false, false
                     FROM webwise.trucker_profiles tp
                     WHERE tp.user_id = :uid
                 """),
                 {"uid": user.get("id")},
             ).first()
     email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    is_beta = bool(row and getattr(row, "is_beta", False))
     needs_handle = not row or not (row.display_name or "").strip()
     has_mc_or_dot = row and ((row.mc_number or "").strip() or (row.dot_number or "").strip())
     needs_mc = row and (row.display_name or "").strip() and not has_mc_or_dot
@@ -909,23 +918,13 @@ def dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_u
             "drivers/partials/onboarding_step2.html",
             {"request": request, "email_domain": email_domain, "display_name": (row.display_name or "").strip()},
         )
-    # Has handle + MC but not yet paid for setup -> show payment step (1–5 trucks)
-    mc_for_ledger = (row.mc_number or row.dot_number or "").strip() if row else ""
-    if mc_for_ledger:
-        with engine.begin() as conn:
-            paid = conn.execute(
-                text("""
-                    SELECT 1 FROM webwise.driver_savings_ledger
-                    WHERE driver_mc_number = :mc AND load_id IN ('STARTER_PACK', 'FLEET_STARTER_PACK')
-                    LIMIT 1
-                """),
-                {"mc": mc_for_ledger},
-            ).first()
-        if not paid:
-            return templates.TemplateResponse(
-                "drivers/partials/onboarding_step2b_payment.html",
-                {"request": request, "email_domain": email_domain},
-            )
+    # Single rule: beta drivers skip Stripe; others must have paid (see deps_trucker.driver_can_skip_payment).
+    profile_for_gate = {"is_beta": is_beta, "mc_number": getattr(row, "mc_number", None), "dot_number": getattr(row, "dot_number", None)} if row else {}
+    if not driver_can_skip_payment(engine, profile_for_gate):
+        return templates.TemplateResponse(
+            "drivers/partials/onboarding_step2b_payment.html",
+            {"request": request, "email_domain": email_domain},
+        )
     from app.services.vesting import VestingService
     balance = VestingService.get_claimable_balance(engine, row.id) if row else 0.0
     is_first_login = bool(row and getattr(row, "is_first_login", False))
@@ -1616,6 +1615,7 @@ def negotiate_accept(
             """),
             {"id": neg[0], "rate": final_rate_val},
         )
+    update_beta_activity(engine, trucker_id=trucker_id, new_stage=STAGE_FIRST_LOAD_WON)
 
     credits_earned = 0.0
     if final_rate_val > 0:
@@ -2216,7 +2216,8 @@ async def confirm_negotiation(negotiation_id: int, request: Request, user: Optio
             """),
             {"id": negotiation_id}
         )
-        
+        update_beta_activity(engine, trucker_id=trucker_id, new_stage=STAGE_FIRST_LOAD_WON)
+
         # Calculate buyback based on reward tier
         from app.services.reward_tier import RewardTierService
         buyback_amount = RewardTierService.calculate_buyback_amount(final_rate, reward_tier)

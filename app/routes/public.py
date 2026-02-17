@@ -5,12 +5,13 @@ from sqlalchemy.exc import ProgrammingError
 from fastapi.responses import HTMLResponse, JSONResponse
 from app.services.load_board import LoadBoardService
 from app.services.email import parse_broker_reply, send_contact_form_email
-from app.services.buyback_notifications import BuybackNotificationService
-
+#from app.core.templates import templates
 from app.core.deps import templates, engine, run_assistant_message
 
 router = APIRouter()
-
+@router.get("/beta", response_class=HTMLResponse)
+def beta_page(request: Request):
+    return templates.TemplateResponse("public/beta.html", {"request": request})
 
 def _get_home_context(request: Request):
     testimonials = []
@@ -62,12 +63,20 @@ def pricing_page(request: Request):
     return templates.TemplateResponse("public/pricing.html", {"request": request})
 
 
+@router.get("/pricing/products")
+def pricing_products_page(request: Request):
+    """Secondary pricing page: Call Packs, Fuel Packs, Broker Subscription. Stripe links TBD."""
+    return templates.TemplateResponse("public/pricing-products.html", {"request": request})
+
+
 @router.get("/token")
 @router.get("/our-token")
 @router.get("/candle")
 def token_page(request: Request):
-    """The $CANDLE Token page - explains tokenomics, rewards, and the debit card."""
-    return templates.TemplateResponse("public/our-token.html", {"request": request})
+    """The $CANDLE Token page - explains tokenomics, Automation Fuel, and the debit card."""
+    import os
+    candle_dex_url = os.getenv("CANDLE_DEX_URL", "https://app.uniswap.org/swap?chain=base")
+    return templates.TemplateResponse("public/our-token.html", {"request": request, "candle_dex_url": candle_dex_url})
 
 
 @router.get("/protocol")
