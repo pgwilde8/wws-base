@@ -237,7 +237,8 @@ def register_trucker(
         print(f"⚠️  Welcome email failed (non-blocking): {e}")
     
     session_token = sign_session({"uid": user_id, "role": "client", "email": email.strip().lower()})
-    response = RedirectResponse(url="/drivers/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    # Send new drivers straight to onboarding → payment ($25) → then Century form
+    response = RedirectResponse(url="/drivers/onboarding/welcome", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         SESSION_COOKIE, session_token, httponly=True, secure=False, samesite="lax", max_age=SESSION_TTL_SECONDS
     )
