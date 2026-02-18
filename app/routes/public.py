@@ -1,11 +1,13 @@
 import os
-from fastapi import APIRouter, Request, Form, Body, HTTPException, BackgroundTasks, status
+from fastapi import APIRouter, Request, Form, Body, HTTPException, BackgroundTasks, status, UploadFile, File
 from fastapi.responses import RedirectResponse
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from fastapi.responses import HTMLResponse, JSONResponse
 from app.services.load_board import LoadBoardService
 from app.services.email import parse_broker_reply, send_contact_form_email, send_factoring_referral_email
+from app.services.storage import upload_bol, get_presigned_url, convert_bol_image_to_pdf
+from app.services.email import send_bol_email
 #from app.core.templates import templates
 from app.core.deps import templates, engine, run_assistant_message
 
@@ -68,6 +70,109 @@ def pricing_page(request: Request):
 def pricing_products_page(request: Request):
     """Secondary pricing page: Call Packs, Fuel Packs, Broker Subscription. Stripe links TBD."""
     return templates.TemplateResponse("public/pricing-products.html", {"request": request})
+
+
+@router.get("/test/bol-upload")
+@router.get("/bolupload")
+def bol_upload_test_page(request: Request):
+    """Test page for BOL uploads to Spaces. In production, this will be behind driver auth."""
+    return templates.TemplateResponse("public/bolupload.html", {"request": request})
+
+
+@router.post("/test/convert-bol-jpg", response_class=HTMLResponse)
+async def convert_existing_bol_jpg(
+    request: Request,
+    jpg_key: str = Form(...),
+    bucket: str = Form("greencandle"),
+):
+    """
+    Convert an existing JPG BOL in Spaces to PDF format.
+    Useful if you uploaded a JPG before the auto-convert feature was added.
+    """
+    try:
+        bucket, pdf_key = convert_bol_image_to_pdf(bucket, jpg_key)
+        presigned_url = get_presigned_url(bucket, pdf_key)
+        
+        return templates.TemplateResponse(
+            "public/partials/bol_upload_result.html",
+            {
+                "request": request,
+                "success": True,
+                "bucket": bucket,
+                "file_key": pdf_key,
+                "presigned_url": presigned_url,
+                "email_sent": False,
+                "email_message": f"Converted JPG to PDF: {jpg_key} → {pdf_key}",
+            },
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return templates.TemplateResponse(
+            "public/partials/bol_upload_result.html",
+            {
+                "request": request,
+                "success": False,
+                "error": str(e),
+            },
+        )
+
+
+@router.post("/test/upload-bol", response_class=HTMLResponse)
+async def test_upload_bol(
+    request: Request,
+    mc_number: str = Form(...),
+    load_id: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """
+    Test endpoint: Upload BOL to Spaces (private), convert to PDF, email to allstarincome@gmail.com.
+    Returns bucket/key and presigned URL.
+    In production, this will be behind driver authentication.
+    """
+    try:
+        # 1. Upload to Spaces (images auto-converted to PDF)
+        bucket, file_key = await upload_bol(file, mc_number, load_id)
+        presigned_url = get_presigned_url(bucket, file_key)
+        
+        # 2. Email the BOL PDF to allstarincome@gmail.com
+        email_result = send_bol_email(
+            to_email="allstarincome@gmail.com",
+            bucket=bucket,
+            file_key=file_key,
+            mc_number=mc_number,
+            load_id=load_id,
+            subject=f"BOL Upload - Load {load_id} (MC: {mc_number})"
+        )
+        
+        email_status = email_result.get("status", "unknown")
+        email_message = email_result.get("message", "")
+        
+        return templates.TemplateResponse(
+            "public/partials/bol_upload_result.html",
+            {
+                "request": request,
+                "success": True,
+                "bucket": bucket,
+                "file_key": file_key,
+                "presigned_url": presigned_url,
+                "file_size": file.size if hasattr(file, "size") else "unknown",
+                "email_sent": email_status == "success",
+                "email_message": email_message,
+            },
+        )
+    except Exception as e:
+        import traceback
+        error_detail = str(e)
+        traceback.print_exc()
+        return templates.TemplateResponse(
+            "public/partials/bol_upload_result.html",
+            {
+                "request": request,
+                "success": False,
+                "error": error_detail,
+            },
+        )
 
 
 @router.get("/token")

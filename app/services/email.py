@@ -3,6 +3,8 @@ import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from typing import Optional, Dict
 from datetime import datetime
 from dotenv import load_dotenv
@@ -279,3 +281,79 @@ Green Candle Dispatch
         return {"status": "success", "sent_to": driver_email}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def send_bol_email(
+    to_email: str,
+    bucket: str,
+    file_key: str,
+    mc_number: str,
+    load_id: str,
+    subject: Optional[str] = None,
+) -> Dict:
+    """
+    Send BOL PDF as email attachment. Downloads from Spaces, attaches PDF, sends via SMTP.
+    
+    Args:
+        to_email: Recipient email address
+        bucket: Spaces bucket name
+        file_key: Spaces key (path) to the BOL PDF
+        mc_number: MC number for email context
+        load_id: Load ID for email context
+        subject: Optional custom subject (defaults to auto-generated)
+    
+    Returns:
+        Dict with status and message
+    """
+    from app.services.storage import get_object
+    
+    if not MXROUTE_SMTP_USER or not MXROUTE_SMTP_PASSWORD:
+        return {"status": "error", "message": "SMTP credentials missing"}
+    
+    try:
+        # Download PDF from Spaces
+        pdf_content = get_object(bucket, file_key)
+        
+        # Create email
+        msg = MIMEMultipart()
+        msg['From'] = MXROUTE_FROM_EMAIL
+        msg['To'] = to_email
+        
+        if not subject:
+            subject = f"BOL Upload - Load {load_id} (MC: {mc_number})"
+        msg['Subject'] = subject
+        
+        # Email body
+        body = f"""New Bill of Lading uploaded.
+
+Load ID: {load_id}
+MC Number: {mc_number}
+Bucket: {bucket}
+Key: {file_key}
+
+The BOL PDF is attached.
+"""
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Attach PDF
+        filename = file_key.split('/')[-1]  # Get just the filename
+        part = MIMEBase('application', 'pdf')
+        part.set_payload(pdf_content)
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+        msg.attach(part)
+        
+        # Send email
+        with smtplib.SMTP_SSL(MX_HOST, MX_PORT) as server:
+            server.login(MXROUTE_SMTP_USER, MXROUTE_SMTP_PASSWORD)
+            server.send_message(msg, to_addrs=[to_email])
+        
+        return {
+            "status": "success",
+            "message": f"BOL email sent to {to_email}",
+            "sent_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"status": "error", "message": f"Failed to send BOL email: {str(e)}"}

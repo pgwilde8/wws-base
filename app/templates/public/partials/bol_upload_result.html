@@ -1,0 +1,74 @@
+{% if success %}
+<div class="bg-green-900/30 border-2 border-green-500/50 rounded-xl p-6 space-y-4">
+    <div class="flex items-center gap-3 text-green-400">
+        <i class="fas fa-check-circle text-2xl"></i>
+        <span class="text-xl font-bold">Upload Successful!</span>
+    </div>
+    
+    <div class="bg-slate-900/50 rounded-lg p-4 space-y-3 text-sm">
+        <div class="flex items-start gap-2">
+            <span class="text-slate-400 font-bold min-w-[80px]">Bucket:</span>
+            <code class="bg-slate-800 px-3 py-1 rounded text-green-400 font-mono">{{ bucket }}</code>
+        </div>
+        <div class="flex items-start gap-2">
+            <span class="text-slate-400 font-bold min-w-[80px]">Key:</span>
+            <code class="bg-slate-800 px-3 py-1 rounded text-blue-400 font-mono break-all">{{ file_key }}</code>
+        </div>
+        {% if file_size and file_size != "unknown" %}
+        <div class="flex items-start gap-2">
+            <span class="text-slate-400 font-bold min-w-[80px]">Size:</span>
+            <span class="text-slate-300">{{ file_size }} bytes</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="bg-blue-900/30 border border-blue-500/50 rounded-lg p-4">
+        <div class="text-blue-400 text-xs font-bold uppercase mb-2">Presigned URL (expires in 1 hour):</div>
+        <a href="{{ presigned_url }}" 
+           target="_blank" 
+           rel="noopener"
+           class="text-blue-300 hover:text-blue-200 text-xs break-all underline block">
+            {{ presigned_url }}
+        </a>
+    </div>
+    
+    {% if email_sent is defined %}
+    <div class="bg-{% if email_sent %}green{% else %}amber{% endif %}-900/30 border border-{% if email_sent %}green{% else %}amber{% endif %}-500/50 rounded-lg p-4">
+        <div class="flex items-center gap-2 text-{% if email_sent %}green{% else %}amber{% endif %}-400 mb-2">
+            <i class="fas fa-{% if email_sent %}check-circle{% else %}exclamation-triangle{% endif %}"></i>
+            <span class="font-bold text-sm">Email Status:</span>
+        </div>
+        <div class="text-{% if email_sent %}green{% else %}amber{% endif %}-300 text-xs">
+            {{ email_message }}
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="bg-slate-800/50 rounded-lg p-4 text-xs text-slate-400">
+        <div class="font-bold text-slate-300 mb-2">✅ What happened:</div>
+        <ul class="list-disc list-inside space-y-1 ml-2">
+            <li>File uploaded to <code class="text-green-400">{{ bucket }}</code> bucket (private)</li>
+            <li>Stored at key: <code class="text-blue-400">{{ file_key }}</code></li>
+            <li>Image converted to PDF automatically</li>
+            {% if email_sent is defined %}
+            <li>PDF emailed to allstarincome@gmail.com</li>
+            {% endif %}
+            <li>Presigned URL generated for viewing (temporary access)</li>
+            <li>Ready for OCR processing and factoring packet generation</li>
+        </ul>
+    </div>
+</div>
+{% else %}
+<div class="bg-red-900/30 border-2 border-red-500/50 rounded-xl p-6">
+    <div class="flex items-center gap-3 text-red-400 mb-4">
+        <i class="fas fa-exclamation-circle text-2xl"></i>
+        <span class="text-xl font-bold">Upload Failed</span>
+    </div>
+    <div class="bg-slate-900/50 rounded-lg p-4">
+        <div class="text-red-300 font-mono text-sm">{{ error }}</div>
+    </div>
+    <p class="text-slate-400 text-xs mt-4">
+        Check server logs for details. Ensure DO_SPACES_KEY and DO_SPACES_SECRET are set in .env
+    </p>
+</div>
+{% endif %}

@@ -13,3 +13,5 @@ boto3
 Pillow
 img2pdf
 stripe
+PyPDF2
+reportlab
