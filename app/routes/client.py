@@ -71,21 +71,27 @@ def client_dashboard(request: Request, user: Optional[Dict] = Depends(current_us
     if not row or not has_display_name or not has_mc_or_dot:
         return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
     trucker_id = row[0]
-    # GATEKEEPER: Check Century Finance approval (unless beta driver)
+    # GATEKEEPER: Century approval OR Universal (setup_fee_paid)
     if not is_beta_driver(profile_for_beta):
         with engine.begin() as conn:
             century_status = conn.execute(
                 text("SELECT status FROM webwise.factoring_referrals WHERE trucker_id = :tid ORDER BY submitted_at DESC LIMIT 1"),
                 {"tid": trucker_id},
             ).scalar()
-            # If no referral exists yet, redirect to century-onboarding (they need to submit after payment)
-            # If PENDING, allow dashboard but show pending message (or redirect to century-onboarding if they haven't submitted)
-            # If APPROVED/SIGNED, allow full dashboard
-            # If DECLINED, allow dashboard but show declined message (refund processed)
-            if century_status is None:
-                # Check if they've paid (have a payment_intent somewhere) — if yes, redirect to century-onboarding
-                # For now, if no referral exists, assume they need to complete onboarding → redirect to century-onboarding
-                # But only if they've completed profile setup (name + MC)
+            setup_fee_paid = False
+            try:
+                setup_fee_paid = conn.execute(
+                    text("SELECT setup_fee_paid FROM webwise.trucker_profiles WHERE id = :tid"),
+                    {"tid": trucker_id},
+                ).scalar() or False
+            except Exception:
+                pass
+            # Unlock if: Century APPROVED, or Universal (setup_fee_paid)
+            if century_status == "APPROVED" or setup_fee_paid:
+                pass  # allow
+            elif century_status in ("PENDING", "CONTACTED", "DECLINED"):
+                pass  # allow (pending/declined get dashboard with banner)
+            elif century_status is None and not setup_fee_paid:
                 return RedirectResponse(url="/drivers/century-onboarding", status_code=303)
             elif century_status in ("PENDING", "CONTACTED"):
                 # Submitted but not approved yet — show dashboard with pending banner (or redirect)
@@ -236,6 +242,57 @@ def load_manage_page(load_id: str, request: Request, user: Optional[Dict] = Depe
     return templates.TemplateResponse(
         "drivers/load_manage.html",
         {"request": request, "load": load_data},
+    )
+
+
+@router.get("/drivers/scout-loads", response_class=HTMLResponse)
+def scout_loads_page(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Jobs the Chrome extension has picked from DAT/TruckSmarter (discovered by this driver)."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not available")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT tp.id, tp.display_name, tp.mc_number, tp.scout_api_key FROM webwise.trucker_profiles tp WHERE tp.user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+        trucker_id = row.id
+        trucker = {"display_name": row.display_name or "Driver", "mc_number": (row.mc_number or "").strip() or "—"}
+        api_key_raw = getattr(row, "scout_api_key", None) if row else None
+        scout_api_key_display = (f"{api_key_raw[:8]}...{api_key_raw[-4:]}" if api_key_raw and len(api_key_raw) > 12 else (api_key_raw[:8] + "..." if api_key_raw else None))
+        try:
+            loads = conn.execute(
+                text("""
+                    SELECT ref_id, origin, destination, price, equipment_type, pickup_date, status, created_at
+                    FROM webwise.loads
+                    WHERE discovered_by_id = :tid
+                    ORDER BY created_at DESC
+                    LIMIT 100
+                """),
+                {"tid": trucker_id},
+            ).fetchall()
+        except Exception:
+            loads = []
+    load_list = [
+        {
+            "ref_id": r.ref_id,
+            "origin": r.origin or "—",
+            "destination": r.destination or "—",
+            "price": r.price or "—",
+            "equipment_type": r.equipment_type or "—",
+            "pickup_date": r.pickup_date or "—",
+            "status": r.status or "NEW",
+            "created_at": r.created_at,
+        }
+        for r in loads
+    ]
+    balance = VestingService.get_claimable_balance(engine, trucker_id) or 0
+    return templates.TemplateResponse(
+        "drivers/scout_loads.html",
+        {"request": request, "trucker": trucker, "loads": load_list, "balance": balance, "scout_api_key_display": scout_api_key_display},
     )
 
 
@@ -741,9 +798,37 @@ def fleet_fuel_audit(request: Request, user: Optional[Dict] = Depends(current_us
     )
 
 
+@router.get("/drivers/setup-payment", response_class=HTMLResponse)
+def setup_payment_page(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Payment-only page. Register-trucker redirects here. Goes straight to Stripe."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    if engine:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT display_name, mc_number, dot_number FROM webwise.trucker_profiles WHERE user_id = :uid"),
+                {"uid": user.get("id")},
+            ).first()
+            if not row or not (row[0] or "").strip():
+                return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+            if not ((row[1] or "").strip() or (row[2] or "").strip()):
+                return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+    return templates.TemplateResponse(
+        "drivers/setup_payment.html",
+        {"request": request, "email_domain": os.getenv("EMAIL_DOMAIN", "gcdloads.com")},
+    )
+
+
 @router.get("/drivers/onboarding", response_class=HTMLResponse)
 def onboarding_redirect(request: Request, user: Optional[Dict] = Depends(current_user)):
-    """Legacy redirect — /drivers/onboarding -> /drivers/onboarding/welcome."""
+    """Legacy redirect — /drivers/onboarding -> setup-payment (or welcome if incomplete)."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    if engine:
+        with engine.begin() as conn:
+            row = conn.execute(text("SELECT display_name, mc_number, dot_number FROM webwise.trucker_profiles WHERE user_id = :uid"), {"uid": user.get("id")}).first()
+            if row and (row[0] or "").strip() and ((row[1] or "").strip() or (row[2] or "").strip()):
+                return RedirectResponse(url="/drivers/setup-payment", status_code=303)
     return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
 
 
@@ -778,6 +863,38 @@ def onboarding_welcome(request: Request, user: Optional[Dict] = Depends(current_
     )
 
 
+# ---- Century flow: same onboarding, Century templates, success -> century-onboarding ----
+@router.get("/century/onboarding/welcome", response_class=HTMLResponse)
+def century_onboarding_welcome(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Century flow: Mission Readiness page. Uses century partials."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    driver_name = "Driver"
+    needs_step1 = True
+    if engine:
+        try:
+            with engine.begin() as conn:
+                row = conn.execute(
+                    text("SELECT display_name, mc_number, dot_number FROM webwise.trucker_profiles WHERE user_id = :uid"),
+                    {"uid": user.get("id")},
+                ).first()
+            if row:
+                display_name = (row[0] or "").strip()
+                if display_name:
+                    driver_name = display_name.split()[0] if display_name else "Driver"
+                has_handle = bool(display_name)
+                has_mc = bool((row[1] or "").strip() or (row[2] or "").strip())
+                if has_handle and has_mc:
+                    needs_step1 = False
+        except Exception:
+            pass
+    return templates.TemplateResponse(
+        "drivers/century_onboarding_welcome.html",
+        {"request": request, "email_domain": email_domain, "needs_step1": needs_step1, "driver_name": driver_name},
+    )
+
+
 @router.get("/drivers/onboarding/check-handle", response_class=HTMLResponse)
 def onboarding_check_handle(
     request: Request,
@@ -806,6 +923,42 @@ def onboarding_check_handle(
                 SELECT id FROM webwise.trucker_profiles
                 WHERE LOWER(TRIM(display_name)) = :handle
             """),
+            {"handle": raw},
+        ).first()
+    if existing:
+        suggestions = [f"{raw}2", f"{raw}.mc", f"driver.{raw}"]
+        sugg_text = " or ".join(suggestions[:3])
+        return templates.TemplateResponse(
+            "drivers/partials/onboarding_handle_taken.html",
+            {"request": request, "handle": raw, "email_domain": email_domain, "suggestions": suggestions, "sugg_text": sugg_text},
+        )
+    return templates.TemplateResponse(
+        "drivers/partials/onboarding_handle_available.html",
+        {"request": request, "handle": raw, "email_domain": email_domain},
+    )
+
+
+@router.get("/century/onboarding/check-handle", response_class=HTMLResponse)
+def century_onboarding_check_handle(
+    request: Request,
+    handle: str = "",
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Century flow: same as onboarding_check_handle."""
+    if not user or user.get("role") != "client" or not engine:
+        return HTMLResponse(content="")
+    raw = (handle or "").strip().lower()
+    if len(raw) < 2:
+        return HTMLResponse(content='<div id="handle-status" class="mt-2 text-[10px] h-4 text-slate-500">Enter 2+ characters</div>')
+    import re
+    if not re.match(r"^[a-z0-9][a-z0-9._-]*[a-z0-9]$|^[a-z0-9]$", raw):
+        return HTMLResponse(content='<div id="handle-status" class="mt-2 text-[10px] h-4 text-amber-400">Use letters, numbers, dots, hyphens only</div>')
+    if len(raw) > 40:
+        return HTMLResponse(content='<div id="handle-status" class="mt-2 text-[10px] h-4 text-amber-400">Max 40 characters</div>')
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    with engine.begin() as conn:
+        existing = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE LOWER(TRIM(display_name)) = :handle"),
             {"handle": raw},
         ).first()
     if existing:
@@ -863,6 +1016,46 @@ def onboarding_claim_handle(
     email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
     return templates.TemplateResponse(
         "drivers/partials/onboarding_step2.html",
+        {"request": request, "email_domain": email_domain, "display_name": raw},
+    )
+
+
+@router.post("/century/onboarding/claim-handle", response_class=HTMLResponse)
+def century_onboarding_claim_handle(
+    request: Request,
+    handle: str = Form(""),
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Century flow: same as claim-handle but returns century_onboarding_step2."""
+    if not user or user.get("role") != "client" or not engine:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    raw = (handle or "").strip().lower()
+    if len(raw) < 2 or len(raw) > 40:
+        raise HTTPException(status_code=400, detail="Handle must be 2–40 characters")
+    import re
+    if not re.match(r"^[a-z0-9][a-z0-9._-]*[a-z0-9]$|^[a-z0-9]$", raw):
+        raise HTTPException(status_code=400, detail="Use letters, numbers, dots, hyphens only")
+    with engine.begin() as conn:
+        taken = conn.execute(
+            text("SELECT id FROM webwise.trucker_profiles WHERE LOWER(TRIM(display_name)) = :handle AND user_id != :uid"),
+            {"handle": raw, "uid": user.get("id")},
+        ).first()
+        if taken:
+            raise HTTPException(status_code=400, detail="Handle is taken")
+        row = conn.execute(text("SELECT id FROM webwise.trucker_profiles WHERE user_id = :uid"), {"uid": user.get("id")}).first()
+        if row:
+            conn.execute(
+                text("UPDATE webwise.trucker_profiles SET display_name = :dn, updated_at = now() WHERE user_id = :uid"),
+                {"dn": raw, "uid": user.get("id")},
+            )
+        else:
+            conn.execute(
+                text("INSERT INTO webwise.trucker_profiles (user_id, display_name, carrier_name, is_first_login) VALUES (:uid, :dn, 'Pending', true)"),
+                {"uid": user.get("id"), "dn": raw},
+            )
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    return templates.TemplateResponse(
+        "drivers/partials/century_onboarding_step2.html",
         {"request": request, "email_domain": email_domain, "display_name": raw},
     )
 
@@ -935,12 +1128,98 @@ def onboarding_claim_mc(
     )
 
 
+@router.post("/century/onboarding/claim-mc", response_class=HTMLResponse)
+def century_onboarding_claim_mc(
+    request: Request,
+    mc_number: str = Form(""),
+    dot_number: str = Form(""),
+    authority_type: str = Form("MC"),
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Century flow: same as claim-mc but returns century_onboarding_step2b_payment."""
+    if not user or user.get("role") != "client" or not engine:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    mc_clean = (mc_number or "").strip().replace(" ", "")
+    dot_clean = (dot_number or "").strip().replace(" ", "")
+    auth_type = (authority_type or "MC").strip().upper()
+    if auth_type not in ("MC", "DOT"):
+        auth_type = "MC"
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    step2_tpl = "drivers/partials/century_onboarding_step2.html"
+    step2b_tpl = "drivers/partials/century_onboarding_step2b_payment.html"
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row or not (row.display_name or "").strip():
+            raise HTTPException(status_code=400, detail="Complete Step 1 first")
+        display_name = (row.display_name or "").strip().lower()
+    if auth_type == "MC":
+        if not mc_clean:
+            return templates.TemplateResponse(step2_tpl, {"request": request, "email_domain": email_domain, "display_name": display_name, "error": "MC Number is required."})
+        mc_digits = "".join(c for c in mc_clean if c.isdigit())
+        if len(mc_digits) < 6 or len(mc_digits) > 8:
+            return templates.TemplateResponse(step2_tpl, {"request": request, "email_domain": email_domain, "display_name": display_name, "error": "MC Number must be 6–8 digits."})
+        mc_clean = mc_digits
+    else:
+        if not dot_clean:
+            return templates.TemplateResponse(step2_tpl, {"request": request, "email_domain": email_domain, "display_name": display_name, "error": "DOT Number is required."})
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id, display_name FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row or not (row.display_name or "").strip():
+            raise HTTPException(status_code=400, detail="Complete Step 1 first")
+        display_name = (row.display_name or "").strip().lower()
+        conn.execute(
+            text("""
+                UPDATE webwise.trucker_profiles
+                SET mc_number = :mc, dot_number = :dot, authority_type = :auth, updated_at = now()
+                WHERE user_id = :uid
+            """),
+            {"mc": mc_clean if auth_type == "MC" else None, "dot": dot_clean if auth_type == "DOT" else None, "auth": auth_type, "uid": user.get("id")},
+        )
+    return templates.TemplateResponse(
+        step2b_tpl,
+        {"request": request, "email_domain": email_domain},
+    )
+
+
 @router.post("/drivers/onboarding/create-setup-checkout")
 def create_setup_checkout(
     body: dict = Body(default_factory=dict),
     user: Optional[Dict] = Depends(current_user),
 ):
-    """Create Stripe Checkout Session for Small Fleet Setup ($25/truck, 1–5 trucks). Returns {url} or {error}."""
+    """Create Stripe Checkout Session for Small Fleet Setup (Universal flow). success_url -> checkout-success-universal."""
+    from fastapi.responses import JSONResponse
+    if not user or user.get("role") != "client":
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+    truck_count = int((body or {}).get("truck_count", 1) or 1)
+    truck_count = max(1, min(5, truck_count))
+    base_url = os.getenv("BASE_URL", "https://greencandledispatch.com").rstrip("/")
+    success_url = f"{base_url}/drivers/onboarding/checkout-success-universal?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{base_url}/drivers/setup-payment"
+    from app.services.stripe_checkout import create_setup_checkout_session
+    url = create_setup_checkout_session(
+        user_id=user["id"],
+        truck_count=truck_count,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        customer_email=user.get("email"),
+    )
+    if url:
+        return JSONResponse(content={"url": url})
+    return JSONResponse(status_code=503, content={"error": "Stripe is not configured. Set STRIPE_SECRET_KEY."})
+
+
+@router.post("/century/onboarding/create-setup-checkout")
+def century_create_setup_checkout(
+    body: dict = Body(default_factory=dict),
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Century flow: Stripe checkout. success_url -> checkout-success (redirects to century-onboarding)."""
     from fastapi.responses import JSONResponse
     if not user or user.get("role") != "client":
         return JSONResponse(status_code=401, content={"error": "Unauthorized"})
@@ -948,7 +1227,7 @@ def create_setup_checkout(
     truck_count = max(1, min(5, truck_count))
     base_url = os.getenv("BASE_URL", "https://greencandledispatch.com").rstrip("/")
     success_url = f"{base_url}/drivers/onboarding/checkout-success?session_id={{CHECKOUT_SESSION_ID}}"
-    cancel_url = f"{base_url}/drivers/onboarding/welcome"
+    cancel_url = f"{base_url}/century/onboarding/welcome"
     from app.services.stripe_checkout import create_setup_checkout_session
     url = create_setup_checkout_session(
         user_id=user["id"],
@@ -1003,6 +1282,88 @@ def checkout_success(
     return RedirectResponse(url="/drivers/century-onboarding", status_code=303)
 
 
+@router.get("/drivers/onboarding/checkout-success-universal", response_class=HTMLResponse)
+def checkout_success_universal(
+    request: Request,
+    session_id: str = "",
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Universal flow: Verify payment, onboard immediately, send email, redirect to dashboard."""
+    if not user or user.get("role") != "client" or not engine:
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not session_id:
+        return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+    from app.services.stripe_checkout import retrieve_and_verify_session
+    meta = retrieve_and_verify_session(session_id)
+    if not meta or int(meta["user_id"]) != user.get("id"):
+        return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+    truck_count = meta["truck_count"]
+    payment_intent_id = meta.get("payment_intent_id")
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id, display_name, mc_number, dot_number FROM webwise.trucker_profiles WHERE user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row or not (row.display_name or "").strip():
+            return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+        mc_for_ledger = (row.mc_number or row.dot_number or "").strip()
+        if not mc_for_ledger:
+            return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+        if payment_intent_id:
+            try:
+                conn.execute(
+                    text("UPDATE webwise.trucker_profiles SET notes = COALESCE(notes, '') || ' PaymentIntent: ' || :pi WHERE user_id = :uid"),
+                    {"pi": payment_intent_id, "uid": user.get("id")},
+                )
+            except Exception:
+                pass
+        # Universal: set setup_fee_paid and onboard
+        try:
+            conn.execute(
+                text("UPDATE webwise.trucker_profiles SET setup_fee_paid = true WHERE user_id = :uid"),
+                {"uid": user.get("id")},
+            )
+        except Exception:
+            pass  # column may not exist until migration run
+    from app.services.onboarding import onboard_new_driver
+    display_name = (row.display_name or "").strip().lower()
+    tier = "FLEET" if truck_count > 1 else "SOLO"
+    app_base = os.getenv("APP_BASE_URL", "https://app.greencandledispatch.com").rstrip("/")
+    login_url = f"{app_base}/login/client"
+    try:
+        dispatch_email, trucker_id, starter_credits = onboard_new_driver(
+            engine, user["id"], row.mc_number or "", row.dot_number or "", display_name, tier=tier
+        )
+        # Send email in background to avoid 504 (SMTP can be slow)
+        import threading
+        def _send():
+            try:
+                from app.services.notifications import send_onboarding_comms
+                send_onboarding_comms(
+                    driver_email=user.get("email", ""),
+                    driver_name=display_name,
+                    mc_number=mc_for_ledger,
+                    dispatch_email=dispatch_email,
+                    starter_credits=starter_credits,
+                    login_url=login_url,
+                )
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+        threading.Thread(target=_send, daemon=True).start()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+    return templates.TemplateResponse(
+        "drivers/onboarding_thank_you.html",
+        {
+            "request": request,
+            "email": user.get("email", ""),
+            "login_url": login_url,
+        },
+    )
+
+
 @router.get("/drivers/century-onboarding", response_class=HTMLResponse)
 def century_onboarding_page(request: Request, user: Optional[Dict] = Depends(current_user)):
     """Post-payment Century Finance referral form — prefilled, required before dashboard unlock."""
@@ -1024,7 +1385,7 @@ def century_onboarding_page(request: Request, user: Optional[Dict] = Depends(cur
                 has_payment = bool(tp_row[1] and "PaymentIntent:" in (tp_row[1] or ""))
                 if not has_payment:
                     # Redirect to payment step
-                    return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+                    return RedirectResponse(url="/drivers/setup-payment", status_code=303)
     # Check if already submitted
     if engine:
         with engine.begin() as conn:
@@ -1214,6 +1575,68 @@ def dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_u
             {"request": request, "balance": balance, "display_name": (row.display_name or "").strip(), "email_domain": email_domain},
         )
     # On welcome page, show a clear CTA when there's no active load instead of the minimal "No Active Loads" box
+    if request.query_params.get("onboarding") == "1" and row:
+        with engine.begin() as conn:
+            has_won = conn.execute(
+                text("SELECT 1 FROM webwise.negotiations WHERE trucker_id = :tid AND status = 'won' LIMIT 1"),
+                {"tid": row.id},
+            ).first()
+        if not has_won:
+            base = str(request.base_url).rstrip("/")
+            dashboard_url = f"{base}/drivers/dashboard"
+            return templates.TemplateResponse(
+                "drivers/partials/onboarding_no_load_yet.html",
+                {"request": request, "dashboard_url": dashboard_url},
+            )
+    return active_load(request, user)
+
+
+@router.get("/century/dashboard-mission", response_class=HTMLResponse)
+def century_dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Century flow: same as dashboard_mission but returns century partials for steps 1–2b."""
+    if not user or user.get("role") != "client" or not engine:
+        return HTMLResponse(content="")
+    try:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("""
+                    SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, tp.is_first_login, COALESCE(tp.is_beta, false) AS is_beta
+                    FROM webwise.trucker_profiles tp WHERE tp.user_id = :uid
+                """),
+                {"uid": user.get("id")},
+            ).first()
+    except ProgrammingError:
+        with engine.begin() as conn:
+            row = conn.execute(
+                text("SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number, tp.authority_type, false, false FROM webwise.trucker_profiles tp WHERE tp.user_id = :uid"),
+                {"uid": user.get("id")},
+            ).first()
+    email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
+    is_beta = bool(row and getattr(row, "is_beta", False))
+    needs_handle = not row or not (row.display_name or "").strip()
+    has_mc_or_dot = row and ((row.mc_number or "").strip() or (row.dot_number or "").strip())
+    needs_mc = row and (row.display_name or "").strip() and not has_mc_or_dot
+    if needs_handle:
+        return templates.TemplateResponse("drivers/partials/century_onboarding_step1.html", {"request": request, "email_domain": email_domain})
+    if needs_mc:
+        return templates.TemplateResponse(
+            "drivers/partials/century_onboarding_step2.html",
+            {"request": request, "email_domain": email_domain, "display_name": (row.display_name or "").strip()},
+        )
+    profile_for_gate = {"is_beta": is_beta, "mc_number": getattr(row, "mc_number", None), "dot_number": getattr(row, "dot_number", None)} if row else {}
+    if not driver_can_skip_payment(engine, profile_for_gate):
+        return templates.TemplateResponse(
+            "drivers/partials/century_onboarding_step2b_payment.html",
+            {"request": request, "email_domain": email_domain},
+        )
+    from app.services.vesting import VestingService
+    balance = VestingService.get_claimable_balance(engine, row.id) if row else 0.0
+    is_first_login = bool(row and getattr(row, "is_first_login", False))
+    if is_first_login and balance > 0:
+        return templates.TemplateResponse(
+            "drivers/partials/onboarding_step3.html",
+            {"request": request, "balance": balance, "display_name": (row.display_name or "").strip(), "email_domain": email_domain},
+        )
     if request.query_params.get("onboarding") == "1" and row:
         with engine.begin() as conn:
             has_won = conn.execute(
@@ -2191,7 +2614,7 @@ async def driver_upload_document(
 ):
     """
     Driver uploads BOL/RateCon/Lumper. Converts images to PDF, stores in Spaces,
-    records in load_documents. On BOL upload, triggers $CANDLE refill (21% of 2% fee).
+    records in load_documents. On BOL upload, triggers $CANDLE refill (21% of 2.5% fee).
     """
     if not user or user.get("role") != "client":
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -2254,7 +2677,7 @@ async def driver_upload_document(
         download_url = None
 
     # 3. TRIGGER THE REFILL (moment file hits Spaces)
-    # dispatch_fee = final_rate * 0.02; candle_kickback = dispatch_fee * 0.21 → add to driver ledger
+    # dispatch_fee = final_rate * 0.025; candle_kickback = dispatch_fee * 0.21 → add to driver ledger
     if doc_type == "BOL" and final_rate > 0:
         with engine.begin() as conn:
             existing = conn.execute(
@@ -3048,10 +3471,10 @@ async def upload_proof_of_delivery(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=error_detail)
 
-    # 3. Calculate the 2% Fee (The Green Candle Logic)
+    # 3. Calculate the 2.5% Fee (The Green Candle Logic)
     # final_rate = load.final_rate 
     final_rate = 3000.00 # Placeholder until you connect DB
-    dispatch_fee = final_rate * 0.02
+    dispatch_fee = final_rate * 0.025
 
     # 4. Update DB Records
     # load.bol_url = bol_url

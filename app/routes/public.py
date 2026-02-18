@@ -66,6 +66,12 @@ def pricing_page(request: Request):
     return templates.TemplateResponse("public/pricing.html", {"request": request})
 
 
+@router.get("/century/pricing")
+def century_pricing_page(request: Request):
+    """Century flow: pricing page with Century Finance partner copy. Pass manually to drivers."""
+    return templates.TemplateResponse("public/century_pricing.html", {"request": request})
+
+
 @router.get("/pricing/products")
 def pricing_products_page(request: Request):
     """Secondary pricing page: Call Packs, Fuel Packs, Broker Subscription. Stripe price IDs from env/code."""
@@ -203,7 +209,7 @@ def token_page(request: Request):
 
 @router.get("/protocol")
 def protocol_page(request: Request):
-    """The Green Candle Protocol page - explains the 2% fee and how it builds equity."""
+    """The Green Candle Protocol page - explains the 2.5% fee and how it builds equity."""
     return templates.TemplateResponse("public/protocol.html", {"request": request})
 
 
@@ -394,8 +400,8 @@ async def chat_greeting():
 
 @router.get("/apply/factoring", response_class=HTMLResponse)
 def apply_factoring_redirect(request: Request):
-    """Legacy public form — redirect to signup flow (all drivers now go through signup → payment → Century approval)."""
-    return RedirectResponse(url="/drivers/onboarding/welcome", status_code=302)
+    """Legacy public form — redirect to signup flow (register → setup-payment → Stripe)."""
+    return RedirectResponse(url="/register-trucker", status_code=302)
 
 
 

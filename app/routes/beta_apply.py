@@ -32,7 +32,7 @@ class BetaApplyIn(BaseModel):
 
     agree_weekly_invoice: bool = Field(
         default=False,
-        description="I agree to weekly invoicing for the 2% dispatch fee after loads are completed.",
+        description="I agree to weekly invoicing for the 2.5% dispatch fee after loads are completed.",
     )
 
 

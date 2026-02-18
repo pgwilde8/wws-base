@@ -87,6 +87,12 @@ def register_trucker_page(request: Request):
     return templates.TemplateResponse("auth/register-trucker.html", {"request": request})
 
 
+@router.get("/century/register-trucker")
+def century_register_trucker_page(request: Request):
+    """Century flow: register page. Pass manually to drivers for Alma experience."""
+    return templates.TemplateResponse("auth/century_register_trucker.html", {"request": request})
+
+
 @router.post("/auth/register-trucker")
 @router.post("/register-trucker")
 def register_trucker(
@@ -237,12 +243,92 @@ def register_trucker(
         print(f"⚠️  Welcome email failed (non-blocking): {e}")
     
     session_token = sign_session({"uid": user_id, "role": "client", "email": email.strip().lower()})
-    # Send new drivers straight to onboarding → payment ($25) → then Century form
-    response = RedirectResponse(url="/drivers/onboarding/welcome", status_code=status.HTTP_303_SEE_OTHER)
+    # Send new drivers straight to setup-payment (Stripe checkout)
+    response = RedirectResponse(url="/drivers/setup-payment", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         SESSION_COOKIE, session_token, httponly=True, secure=False, samesite="lax", max_age=SESSION_TTL_SECONDS
     )
     return response
+
+
+@router.post("/century/register-trucker")
+def century_register_trucker(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    display_name: str = Form(...),
+    mc_number: str = Form(""),
+    dot_number: str = Form(""),
+    authority_type: str = Form("MC"),
+    carrier_name: str = Form(...),
+    truck_identifier: str = Form(""),
+    has_factoring: str = Form("no"),
+    factoring_company_name: str = Form(None),
+    interested_in_otr: str = Form(None),
+):
+    """Century flow: same as register_trucker but redirects to /century/onboarding/welcome."""
+    err_tpl = "auth/century_register_trucker.html"
+    if get_user_by_email(email):
+        return templates.TemplateResponse(err_tpl, {"request": request, "error": "Email already registered."})
+    if not engine:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database not configured")
+    try:
+        password_hash = hash_password(password)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not hash password")
+    referral_status = "NONE"
+    factoring_co = None
+    if has_factoring == "yes" and factoring_company_name:
+        factoring_co = factoring_company_name.strip()
+        referral_status = "EXISTING_CLIENT"
+    elif interested_in_otr:
+        referral_status = "OTR_REQUESTED"
+    with engine.begin() as conn:
+        r = conn.execute(
+            text("""
+                INSERT INTO webwise.users (email, password_hash, role, is_active, factoring_company, referral_status)
+                VALUES (:email, :password_hash, 'client', true, :factoring_company, :referral_status)
+                RETURNING id
+            """),
+            {"email": email.strip().lower(), "password_hash": password_hash, "factoring_company": factoring_co, "referral_status": referral_status},
+        )
+        row = r.one()
+        user_id = row.id
+        mc_clean = mc_number.strip() if mc_number else ""
+        dot_clean = dot_number.strip() if dot_number else ""
+        auth_type = authority_type.strip().upper() if authority_type else "MC"
+        if auth_type not in ["MC", "DOT"]:
+            auth_type = "MC"
+        if auth_type == "MC" and not mc_clean:
+            return templates.TemplateResponse(err_tpl, {"request": request, "error": "MC Number is required when MC is selected."})
+        if auth_type == "DOT" and not dot_clean:
+            return templates.TemplateResponse(err_tpl, {"request": request, "error": "DOT Number is required when DOT is selected."})
+        conn.execute(
+            text("""
+                INSERT INTO webwise.trucker_profiles (user_id, display_name, mc_number, dot_number, authority_type, carrier_name, truck_identifier)
+                VALUES (:user_id, :display_name, :mc_number, :dot_number, :authority_type, :carrier_name, :truck_identifier)
+            """),
+            {
+                "user_id": user_id,
+                "display_name": display_name.strip(),
+                "mc_number": mc_clean or None,
+                "dot_number": dot_clean or None,
+                "authority_type": auth_type,
+                "carrier_name": carrier_name.strip(),
+                "truck_identifier": (truck_identifier or "").strip() or None,
+            },
+        )
+    try:
+        from app.services.welcome_email import send_welcome_email_to_driver
+        import threading
+        threading.Thread(target=send_welcome_email_to_driver, args=(email.strip().lower(), display_name.strip()), daemon=True).start()
+    except Exception as e:
+        print(f"Welcome email failed: {e}")
+    session_token = sign_session({"uid": user_id, "role": "client", "email": email.strip().lower()})
+    response = RedirectResponse(url="/century/onboarding/welcome", status_code=status.HTTP_303_SEE_OTHER)
+    response.set_cookie(SESSION_COOKIE, session_token, httponly=True, secure=False, samesite="lax", max_age=SESSION_TTL_SECONDS)
+    return response
+
 
 @router.get("/register")
 async def register_page(request: Request, ref: str = None):

@@ -46,7 +46,7 @@ def admin_dashboard(request: Request):
 
 @router.get("/admin/revenue-stats", dependencies=[Depends(require_admin)])
 def admin_revenue_stats(request: Request):
-    """HTMX: returns the Buyback Engine widget (RevenueService: 2% of WON loads)."""
+    """HTMX: returns the Buyback Engine widget (RevenueService: 2.5% of WON loads)."""
     stats = RevenueService.get_buyback_stats_from_engine(engine)
     return templates.TemplateResponse(
         "partials/revenue_stats_widget.html",
@@ -109,7 +109,7 @@ def mark_negotiation_replied(negotiation_id: int, body: dict | None = Body(None)
 async def mark_negotiation_won(negotiation_id: int, body: dict = Body(...)):
     """
     Broker said yes at this price → WON. 
-    This is the critical trigger for the 2% buyback (Transak/Slack/Discord notification).
+    This is the critical trigger for the 2.5% buyback (Transak/Slack/Discord notification).
     """
     final_rate = body.get("final_rate")
     if final_rate is None:
@@ -232,7 +232,7 @@ async def mark_negotiation_won(negotiation_id: int, body: dict = Body(...)):
     from app.services.burn import record_revenue
     from app.models.treasury import RevenueSourceType
 
-    platform_fee = (Decimal(str(final_rate)) * Decimal("0.02")).quantize(Decimal("0.01"))
+    platform_fee = (Decimal(str(final_rate)) * Decimal("0.025")).quantize(Decimal("0.01"))
     if platform_fee > 0 and engine:
         try:
             record_revenue(

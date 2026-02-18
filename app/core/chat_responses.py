@@ -36,7 +36,7 @@ def _load_system_prompt() -> str:
     # Fallback: return a minimal prompt if file not found
     return """You are a friendly assistant for Green Candle Dispatch—AI dispatch for owner-operators. 
 Help drivers understand the service: AI scans load boards 24/7, negotiates rates, handles paperwork. 
-Flat 2% fee only after funding. Guide drivers to sign up at /beta/apply or /register. 
+Flat 2.5% fee only after funding. Guide drivers to sign up at /beta/apply or /register. 
 Be friendly, direct, trucker-focused. Don't oversell."""
 
 # Initialize OpenAI client

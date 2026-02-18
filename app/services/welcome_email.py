@@ -59,7 +59,7 @@ WHAT HAPPENS NEXT:
 1. AI negotiates → Your agent drafts emails to brokers asking for better rates
 2. Broker replies → When they say "yes" with a rate, you'll get a notification
 3. You confirm → Review the rate and click CONFIRM (or reject if something looks off)
-4. Load secured → Once you confirm, 2% goes to the $CANDLE buyback pool
+4. Load secured → Once you confirm, 2.5% goes to the $CANDLE buyback pool
 
 WATCH THE LIVE BUYBACK FEED:
 Join our Discord to see every load win, every buyback trigger, every driver contribution in real-time:

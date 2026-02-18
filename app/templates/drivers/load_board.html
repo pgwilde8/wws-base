@@ -57,6 +57,16 @@
                         </button>
                     </form>
                 </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+                    <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Market Hotspots</h3>
+                    <p class="text-xs text-slate-500">Where the money is right now. Data refreshes when Scout is active.</p>
+                    <div class="mt-4 p-3 bg-black/40 rounded-xl border border-slate-800">
+                        <p class="text-xs text-slate-400">NJ → FL, GA, SC: ~$2.45/mi</p>
+                        <p class="text-xs text-slate-400 mt-2">TX → CA: ~$2.65/mi</p>
+                        <p class="text-xs text-slate-500 mt-3">Connect your load board to see live data.</p>
+                    </div>
+                </div>
             </section>
 
             <section class="space-y-6">
@@ -89,26 +99,6 @@
                         <div class="h-10 bg-slate-800 rounded w-full"></div>
                     </div>
                 </div>
-
-                <div id="scout-status-container" class="bg-slate-900 border border-slate-800 rounded-3xl p-6"
-                     hx-get="/drivers/scout-status"
-                     hx-trigger="load, every 30s"
-                     hx-swap="innerHTML">
-                    <div class="animate-pulse space-y-3">
-                        <div class="h-4 bg-slate-800 rounded w-1/2"></div>
-                        <div class="h-10 bg-slate-800 rounded w-full"></div>
-                    </div>
-                </div>
-
-                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6">
-                    <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Market Hotspots</h3>
-                    <p class="text-xs text-slate-500">Where the money is right now. Data refreshes when Scout is active.</p>
-                    <div class="mt-4 p-3 bg-black/40 rounded-xl border border-slate-800">
-                        <p class="text-xs text-slate-400">NJ → FL, GA, SC: ~$2.45/mi</p>
-                        <p class="text-xs text-slate-400 mt-2">TX → CA: ~$2.65/mi</p>
-                        <p class="text-xs text-slate-500 mt-3">Connect your load board to see live data.</p>
-                    </div>
-                </div>
             </section>
         </div>
     </main>
@@ -118,17 +108,25 @@
             <a href="/drivers/dashboard" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
                 <i class="fas fa-home"></i> Dashboard
             </a>
-            <a href="/drivers/load-board" class="bg-blue-600 text-white px-6 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
-                <i class="fas fa-satellite-dish"></i> Load Board
+            <a href="/drivers/scout-loads" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fas fa-satellite-dish"></i> Scout Loads
             </a>
-            <a href="/drivers/fleet" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+            <a href="/drivers/load-board" class="bg-blue-600 text-white px-6 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
+                <i class="fas fa-radar"></i> Load Board
+            </a>
+            <a href="/drivers/fleet" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition">
                 <i class="fas fa-truck-ramp-box"></i> Fleet
             </a>
-            <a href="/drivers/terminal" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
-                <i class="fas fa-terminal"></i> Terminal
+            <a href="/drivers/uploads" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fas fa-file-upload"></i> Paperwork
             </a>
+            <button type="button" onclick="document.getElementById('help-drawer').classList.remove('translate-x-full')" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fas fa-question-circle"></i> Help
+            </button>
         </div>
     </nav>
+
+    {% include "drivers/partials/help_drawer.html" %}
 
 </body>
 </html>

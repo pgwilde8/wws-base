@@ -1,0 +1,114 @@
+<div class="space-y-6" id="onboarding-container">
+    <div class="p-6 bg-slate-900/50 border border-slate-800 rounded-2xl">
+        <h2 class="text-lg font-bold text-white mb-2">Step 2: Verify Operating Authority</h2>
+        <p class="text-slate-400 text-sm">Brokers need to confirm your carrier is legitimate before they'll work with our AI. Enter your MC or DOT number so Scout can vouch for you in negotiations. This stays private and is only used to verify your authority.</p>
+    </div>
+    <div class="bg-slate-900 border-2 border-dashed border-slate-700 rounded-2xl p-6">
+    <form id="mc-form" class="space-y-4" hx-post="/century/onboarding/claim-mc"
+          hx-target="#onboarding-container"
+          hx-swap="outerHTML">
+        <div class="flex items-center justify-center gap-2 mb-4">
+            <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">✓</span>
+            <span class="bg-green-500 text-black text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center">2</span>
+            <span class="bg-slate-700 text-slate-400 text-[10px] font-bold w-6 h-6 rounded-full flex items-center justify-center">3</span>
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mb-2">
+            <i class="fas fa-shield-halved text-amber-500 text-sm"></i>
+            <span class="text-[9px] text-amber-400 uppercase font-bold tracking-wider">Safety & Compliance</span>
+        </div>
+        <h3 class="text-green-400 font-bold mb-1 text-center">Enter MC/DOT</h3>
+        <p class="text-[10px] text-slate-500 text-center mb-4">
+            Your AI agent needs your MC/DOT numbers to vouch for you during broker negotiations.
+        </p>
+        {% if display_name %}
+        <p class="text-[10px] text-slate-500 text-center mb-4">
+            Dispatch identity: <span class="text-white font-mono">{{ display_name }}@{{ email_domain }}</span>
+        </p>
+        {% endif %}
+
+        {% if error %}
+        <div id="mc-error" class="mb-4 p-3 bg-red-900/40 border border-red-500/50 rounded-lg text-red-300 text-xs text-center">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <div class="space-y-4 max-w-xs mx-auto">
+            <div class="flex gap-4 justify-center mb-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="auth_toggle" value="MC" checked onchange="toggleAuthorityFields()">
+                    <span class="text-xs text-slate-400">MC</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="auth_toggle" value="DOT" onchange="toggleAuthorityFields()">
+                    <span class="text-xs text-slate-400">DOT</span>
+                </label>
+            </div>
+            <div id="mc-field">
+                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">
+                    <i class="fas fa-truck mr-1 text-slate-500"></i>MC Number
+                </label>
+                <input type="text"
+                       name="mc_number"
+                       id="mc_number"
+                       placeholder="e.g. 123456"
+                       maxlength="8"
+                       class="w-full bg-slate-950 border-2 border-slate-600 p-3 rounded-lg text-center font-mono text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                <p class="text-[9px] text-slate-600 mt-1 text-center">6–8 digits</p>
+            </div>
+            <div id="dot-field" class="hidden">
+                <label class="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">
+                    <i class="fas fa-id-card mr-1 text-slate-500"></i>DOT Number
+                </label>
+                <input type="text"
+                       name="dot_number"
+                       id="dot_number"
+                       placeholder="e.g. 1234567"
+                       maxlength="10"
+                       class="w-full bg-slate-950 border-2 border-slate-600 p-3 rounded-lg text-center font-mono text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+            </div>
+        </div>
+
+        <input type="hidden" name="authority_type" id="authority_type" value="MC">
+
+        <div class="flex justify-center mt-6">
+            <button type="submit"
+                    class="bg-green-600 hover:bg-green-500 text-white text-xs font-bold py-3 px-8 rounded-full transition active:scale-95 flex items-center gap-2">
+                <i class="fas fa-link"></i>
+                Link Authority
+            </button>
+        </div>
+    </form>
+    </div>
+</div>
+
+<script>
+(function() {
+    function toggleAuthorityFields() {
+        var isMC = document.querySelector('input[name="auth_toggle"]:checked')?.value === 'MC';
+        var mcField = document.getElementById('mc-field');
+        var dotField = document.getElementById('dot-field');
+        var mcInput = document.getElementById('mc_number');
+        var dotInput = document.getElementById('dot_number');
+        var authHidden = document.getElementById('authority_type');
+        if (!mcField || !dotField || !mcInput || !dotInput || !authHidden) return;
+        if (isMC) {
+            mcField.classList.remove('hidden');
+            dotField.classList.add('hidden');
+            mcInput.required = true;
+            dotInput.required = false;
+            dotInput.value = '';
+            authHidden.value = 'MC';
+        } else {
+            mcField.classList.add('hidden');
+            dotField.classList.remove('hidden');
+            mcInput.required = false;
+            mcInput.value = '';
+            dotInput.required = true;
+            authHidden.value = 'DOT';
+        }
+    }
+    toggleAuthorityFields();
+    window.toggleAuthorityFields = toggleAuthorityFields;
+})();
+</script>

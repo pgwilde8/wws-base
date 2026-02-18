@@ -92,6 +92,7 @@ app.include_router(ingest_router, prefix="/api/ingest", tags=["ingest"])
 app.include_router(api_router)  # Scout heartbeat, etc.
 app.include_router(ops_treasury_router)
 app.include_router(webhooks_router, prefix="/webhooks")
+app.include_router(webhooks_router, prefix="/api/webhooks")  # Stripe Dashboard often uses /api/webhooks
 
 
 @app.get("/test-error/{code}")

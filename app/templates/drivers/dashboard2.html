@@ -61,82 +61,98 @@
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        <section class="lg:col-span-1 space-y-6">
-            <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Live Intelligence</h3>
-            
-            <div id="scout-status-container"
-                 class="bg-slate-900 border border-slate-800 rounded-3xl p-6"
-                 hx-get="/drivers/scout-status"
-                 hx-trigger="load, every 60s"
-                 hx-swap="innerHTML">
-                <div class="animate-pulse flex flex-col space-y-4">
-                    <div class="h-4 bg-slate-800 rounded w-1/2"></div>
-                    <div class="h-10 bg-slate-800 rounded w-full"></div>
-                </div>
-            </div>
-
-            <div class="bg-blue-900/10 border border-blue-500/20 rounded-3xl p-6">
-                <h4 class="text-xs font-bold text-blue-400 mb-4 uppercase">Automation Fuel Costs</h4>
-                <div class="space-y-3">
-                    <div class="flex justify-between text-xs">
-                        <span class="text-slate-400">Negotiation / Counter</span>
-                        <span class="font-bold text-white">0.5</span>
+    <main class="max-w-7xl mx-auto p-6 space-y-8">
+        <!-- Card 1: Scout Picked Loads (jobs the extension has picked) -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <a href="/drivers/scout-loads" class="block bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-blue-500/40 transition group">
+                <div class="flex items-start gap-4">
+                    <div class="bg-blue-600/20 p-3 rounded-xl group-hover:bg-blue-600/30 transition">
+                        <i class="fas fa-satellite-dish text-blue-400 text-xl"></i>
                     </div>
-                    <div class="flex justify-between text-xs">
-                        <span class="text-slate-400">Voice Escalation</span>
-                        <span class="font-bold text-white">0.5</span>
-                    </div>
-                    <div class="flex justify-between text-xs">
-                        <span class="text-slate-400">Factoring Packet</span>
-                        <span class="font-bold text-white">0.3</span>
-                    </div>
-                    <div class="flex justify-between text-xs">
-                        <span class="text-slate-400">Full Dispatch (Booked)</span>
-                        <span class="font-bold text-green-400">10</span>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-white font-bold text-lg mb-1">Scout Picked Loads</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Jobs the Chrome extension has picked from DAT / TruckSmarter. View and deploy from the Load Board.</p>
+                        <span class="inline-block mt-4 text-blue-400 font-bold text-sm group-hover:text-blue-300">View Scout Loads →</span>
                     </div>
                 </div>
-            </div>
+            </a>
 
-            <div class="bg-green-900/10 border border-green-500/20 rounded-3xl p-6">
-                <h4 class="text-xs font-bold text-green-400 mb-3 uppercase flex items-center gap-2">
-                    <i class="fas fa-file-invoice"></i> When you win a load
-                </h4>
-                <p class="text-slate-300 text-xs leading-relaxed mb-3">
-                    After you win a negotiation, use <strong class="text-white">Manage</strong> (on the load card or under <a href="/drivers/uploads" class="text-green-400 hover:text-green-300 underline">Paperwork</a>) to get funded:
-                </p>
-                <ol class="text-slate-400 text-xs space-y-2 list-decimal list-inside">
-                    <li><strong class="text-slate-300">BOL</strong> — Upload proof of delivery (image or PDF).</li>
-                    <li><strong class="text-slate-300">Invoice</strong> — Fill broker info and generate the invoice.</li>
-                    <li><strong class="text-slate-300">Send to Century</strong> — One click sends BOL + invoice + RateCon to Century Finance for funding.</li>
-                </ol>
-                <a href="/drivers/uploads" class="mt-4 inline-block text-green-400 hover:text-green-300 text-xs font-bold">
-                    <i class="fas fa-file-upload mr-1"></i> Go to Paperwork
-                </a>
+            <!-- Card 2: After you win → Manage / Paperwork -->
+            <a href="/drivers/uploads" class="block bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-green-500/40 transition group">
+                <div class="flex items-start gap-4">
+                    <div class="bg-green-600/20 p-3 rounded-xl group-hover:bg-green-600/30 transition">
+                        <i class="fas fa-file-invoice text-green-400 text-xl"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-white font-bold text-lg mb-1">After you win a load</h3>
+                        <p class="text-slate-400 text-sm leading-relaxed">Use <strong class="text-slate-300">Manage</strong> (on the load card or under Paperwork) to get funded: upload BOL, create invoice, send packet to Century Finance.</p>
+                        <span class="inline-block mt-4 text-green-400 font-bold text-sm group-hover:text-green-300">Go to Paperwork →</span>
+                    </div>
+                </div>
+            </a>
+        </section>
+
+        <!-- Card 3: Automation Fuel Costs -->
+        <section>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <i class="fas fa-gas-pump text-blue-500"></i> Automation Fuel Costs
+                </h3>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                        <div class="text-slate-400 text-xs uppercase font-bold">Negotiation / Counter</div>
+                        <div class="text-white font-black text-lg mt-1">0.5 <span class="text-blue-500 text-xs">$CANDLE</span></div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                        <div class="text-slate-400 text-xs uppercase font-bold">Voice Escalation</div>
+                        <div class="text-white font-black text-lg mt-1">0.5 <span class="text-blue-500 text-xs">$CANDLE</span></div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                        <div class="text-slate-400 text-xs uppercase font-bold">Factoring Packet</div>
+                        <div class="text-white font-black text-lg mt-1">0.3 <span class="text-blue-500 text-xs">$CANDLE</span></div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                        <div class="text-slate-400 text-xs uppercase font-bold">Full Dispatch (Booked)</div>
+                        <div class="text-green-400 font-black text-lg mt-1">10 <span class="text-blue-500 text-xs">$CANDLE</span></div>
+                    </div>
+                </div>
             </div>
         </section>
 
-        <section class="lg:col-span-2 space-y-6">
-            <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Active Negotiations</h3>
-            
-            <div id="active-missions-container" 
-                 hx-get="/drivers/dashboard-active-loads" 
-                 hx-trigger="load, every 30s, dashboardActiveLoadsRefresh from:body" 
-                 hx-swap="innerHTML"
-                 class="min-h-[400px]">
-                
-                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center">
-                    <div class="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-600">
-                        <i class="fas fa-radar text-2xl"></i>
+        <!-- Scout status (compact) + Active Negotiations -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1">
+                <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-3">Scout Status</h3>
+                <div id="scout-status-container"
+                     class="bg-slate-900 border border-slate-800 rounded-2xl p-6"
+                     hx-get="/drivers/scout-status"
+                     hx-trigger="load, every 60s"
+                     hx-swap="innerHTML">
+                    <div class="animate-pulse flex flex-col space-y-3">
+                        <div class="h-4 bg-slate-800 rounded w-2/3"></div>
+                        <div class="h-8 bg-slate-800 rounded w-full"></div>
                     </div>
-                    <h4 class="text-white font-bold">Scanning for Opportunities</h4>
-                    <p class="text-slate-500 text-xs mt-2 max-w-xs mx-auto">
-                        Your 10.0 $CANDLE fuel is ready. Open your load board to deploy Scout and start a negotiation.
-                    </p>
-                    <a href="/drivers/load-board" class="mt-6 inline-block bg-white text-black font-bold text-[10px] px-6 py-3 rounded-full uppercase tracking-tighter hover:bg-blue-500 hover:text-white transition">
-                        Open Load Board
-                    </a>
+                </div>
+            </div>
+            <div class="lg:col-span-2">
+                <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-3">Active Negotiations</h3>
+                <div id="active-missions-container" 
+                     hx-get="/drivers/dashboard-active-loads" 
+                     hx-trigger="load, every 30s, dashboardActiveLoadsRefresh from:body" 
+                     hx-swap="innerHTML"
+                     class="min-h-[320px]">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+                        <div class="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-600">
+                            <i class="fas fa-radar text-2xl"></i>
+                        </div>
+                        <h4 class="text-white font-bold">Scanning for Opportunities</h4>
+                        <p class="text-slate-500 text-xs mt-2 max-w-xs mx-auto">
+                            Your fuel is ready. Open your load board to deploy Scout and start a negotiation.
+                        </p>
+                        <a href="/drivers/load-board" class="mt-6 inline-block bg-white text-black font-bold text-[10px] px-6 py-3 rounded-full uppercase tracking-tighter hover:bg-blue-500 hover:text-white transition">
+                            Open Load Board
+                        </a>
+                    </div>
                 </div>
             </div>
         </section>
@@ -147,17 +163,17 @@
             <a href="/drivers/dashboard" class="bg-blue-600 text-white px-6 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
                 <i class="fas fa-home"></i> Dashboard
             </a>
+            <a href="/drivers/scout-loads" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fas fa-satellite-dish"></i> Scout Loads
+            </a>
             <a href="/drivers/load-board" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
-                <i class="fas fa-satellite-dish"></i> Load Board
+                <i class="fas fa-radar"></i> Load Board
             </a>
             <a href="/drivers/fleet" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition">
                 <i class="fas fa-truck-ramp-box"></i> Fleet
             </a>
             <a href="/drivers/uploads" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
                 <i class="fas fa-file-upload"></i> Paperwork
-            </a>
-            <a href="/drivers/terminal" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition">
-                <i class="fas fa-terminal"></i> Terminal
             </a>
             <button type="button" onclick="document.getElementById('help-drawer').classList.remove('translate-x-full')" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
                 <i class="fas fa-question-circle"></i> Help

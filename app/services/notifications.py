@@ -15,6 +15,7 @@ def send_onboarding_comms(
     dispatch_email: str,
     starter_credits: float = 10.0,
     phone: Optional[str] = None,
+    login_url: Optional[str] = None,
 ) -> dict:
     """
     Triggered immediately after onboard_new_driver() succeeds.
@@ -38,6 +39,7 @@ def send_onboarding_comms(
             MXROUTE_FROM_EMAIL,
         )
 
+        url = login_url or LOGIN_URL
         template_dir = os.path.join(os.path.dirname(__file__), "..", "templates", "emails")
         env = Environment(loader=FileSystemLoader(template_dir))
         template = env.get_template("welcome_onboarding.html")
@@ -46,7 +48,7 @@ def send_onboarding_comms(
             mc_number=mc_number,
             dispatch_email=dispatch_email,
             starter_credits=starter_credits,
-            login_url=LOGIN_URL,
+            login_url=url,
         )
 
         msg = MIMEMultipart("alternative")
@@ -55,7 +57,7 @@ def send_onboarding_comms(
         msg["Subject"] = f"Your GCD Identity is Live – {int(starter_credits)} $CANDLE Ready"
         text_fallback = (
             f"Welcome, {driver_name}! Your dispatch identity {dispatch_email} is active. "
-            f"We've loaded {starter_credits} $CANDLE into your tank. Login: {LOGIN_URL}"
+            f"We've loaded {starter_credits} $CANDLE into your tank. Login: {url}"
         )
         msg.attach(MIMEText(text_fallback, "plain"))
         msg.attach(MIMEText(html_content, "html"))
@@ -74,7 +76,7 @@ def send_onboarding_comms(
     if phone and phone.strip():
         sms_body = (
             f"Welcome to the Fleet, {driver_name}! Your Dispatch Identity {dispatch_email} is active. "
-            f"We've loaded {starter_credits} $CANDLE into your tank. Login: {LOGIN_URL}"
+            f"We've loaded {starter_credits} $CANDLE into your tank. Login: {url}"
         )
         # TODO: Twilio integration
         # from twilio.rest import Client; client.messages.create(...)

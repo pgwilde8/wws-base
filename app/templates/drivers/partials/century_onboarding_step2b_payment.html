@@ -4,8 +4,9 @@
         <p class="text-slate-400 text-sm mb-3">Select the number of trucks in your fleet. Setup is $25 per truck and includes $CANDLE credits for AI dispatch automation.</p>
         <div class="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 mt-4">
             <p class="text-xs text-blue-200 font-semibold mb-2">📋 Next Step After Payment:</p>
-            <p class="text-xs text-blue-100">Pay $25 per truck and get instant access. We&rsquo;ll email you right away with your login. Use your own factor or connect one later — no approval wait.</p>
-            <p class="text-xs text-blue-200 mt-2">Login at <strong>app.greencandledispatch.com</strong> to start using your dashboard.</p>
+            <p class="text-xs text-blue-100">After payment, you will submit a quick form to our factoring partner <strong>Century Finance</strong> for same-day funding approval. Alma will personally review your application (usually 1-2 business days).</p>
+            <p class="text-xs text-blue-200 mt-2"><strong>If approved:</strong> Your full dashboard unlocks automatically.</p>
+            <p class="text-xs text-blue-200"><strong>If declined:</strong> Full refund of your $25 setup fee (processed within 3-5 business days).</p>
         </div>
     </div>
     <div class="bg-slate-900 border-2 border-dashed border-slate-700 rounded-2xl p-6">
@@ -47,7 +48,7 @@
             <div class="mt-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
                 <label class="flex items-start gap-2 cursor-pointer text-xs text-slate-300">
                     <input type="checkbox" id="agree-refund" class="mt-0.5 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500" required />
-                    <span>I understand the $25 setup fee is non-refundable after account activation. By proceeding, I agree to the terms of service.</span>
+                    <span>I understand the $25 setup fee is refundable if Century Finance declines my funding application. By proceeding, I agree to submit my information to Century Finance for approval.</span>
                 </label>
             </div>
 
@@ -100,7 +101,7 @@
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Redirecting...';
             var truckCount = parseInt(select.value, 10) || 1;
-            fetch('/drivers/onboarding/create-setup-checkout', {
+            fetch('/century/onboarding/create-setup-checkout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 body: JSON.stringify({ truck_count: truckCount }),

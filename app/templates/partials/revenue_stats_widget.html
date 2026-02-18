@@ -4,7 +4,7 @@
     <span class="text-3xl font-black text-white">${{ "%.2f"|format(pending_buyback) }}</span>
     <span class="text-green-500 text-xs font-bold">Pending Buyback</span>
   </div>
-  <p class="text-gray-400 text-xs mt-1">Calculated from 2% of completed "Wins"</p>
+  <p class="text-gray-400 text-xs mt-1">Calculated from 2.5% of completed "Wins"</p>
   {% if win_count is defined and win_count is number %}
   <p class="text-gray-500 text-xs mt-2">{{ win_count }} win{{ 's' if win_count != 1 else '' }} · ${{ "%.2f"|format(total_revenue|default(0)) }} revenue</p>
   {% endif %}

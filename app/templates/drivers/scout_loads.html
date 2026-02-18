@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scout Picked Loads | Green Candle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .neon-glow { text-shadow: 0 0 8px rgba(59, 130, 246, 0.5); }
+        body { background-color: #020617; }
+    </style>
+</head>
+<body class="text-slate-200 font-sans pb-24">
+
+    <header class="p-6 bg-slate-900 border-b border-slate-800 sticky top-0 z-50 shadow-2xl">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <a href="/drivers/dashboard" class="text-slate-400 hover:text-white">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div class="bg-blue-600 p-3 rounded-2xl shadow-lg shadow-blue-500/20">
+                    <i class="fas fa-satellite-dish text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-black tracking-tighter text-white">SCOUT PICKED LOADS</h1>
+                    <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Jobs the Chrome extension has picked</p>
+                    <p class="text-slate-400 text-sm">From DAT / TruckSmarter</p>
+                </div>
+            </div>
+            <div class="w-full md:w-64 bg-black/40 border border-slate-800 p-4 rounded-2xl">
+                <div class="flex justify-between items-end">
+                    <span class="text-[9px] font-black text-slate-500 uppercase">Fuel</span>
+                    <span class="text-lg font-black text-white neon-glow">{{ "%.1f"|format(balance) }} <span class="text-xs text-blue-500">$CANDLE</span></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto p-6">
+        <p class="text-slate-400 text-sm mb-6">
+            Loads below were captured by your Scout Chrome extension from load boards. Deploy from the Load Board to start a negotiation.
+        </p>
+
+        {% if loads %}
+        <div class="space-y-3">
+            {% for load in loads %}
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center gap-4">
+                <div class="flex-1 min-w-0">
+                    <div class="text-white font-bold">{{ load.origin }} → {{ load.destination }}</div>
+                    <div class="text-slate-500 text-xs mt-1">
+                        {{ load.price }} · {{ load.equipment_type }}{% if load.pickup_date %} · {{ load.pickup_date }}{% endif %}
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="bg-slate-800 text-slate-400 px-2 py-1 rounded text-xs">{{ load.status }}</span>
+                    <a href="/drivers/load-board" class="text-blue-400 hover:text-blue-300 text-xs font-bold">
+                        Deploy Scout →
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+            <div class="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-600">
+                <i class="fas fa-satellite-dish text-2xl"></i>
+            </div>
+            <h3 class="text-white font-bold">No Scout loads yet</h3>
+            <p class="text-slate-500 text-sm mt-2 max-w-sm mx-auto">
+                Use the Chrome extension on DAT or TruckSmarter to capture loads. They'll appear here.
+            </p>
+            <a href="/drivers/load-board" class="mt-6 inline-block bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm px-6 py-3 rounded-xl transition">
+                Open Load Board
+            </a>
+        </div>
+        {% endif %}
+
+        <div class="mt-8 pt-6 border-t border-slate-800">
+            <a href="/drivers/dashboard" class="text-slate-400 hover:text-white text-sm font-medium">
+                <i class="fas fa-arrow-left mr-1"></i> Back to Dashboard
+            </a>
+        </div>
+    </main>
+
+    <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-2 rounded-2xl shadow-2xl z-50">
+        <div class="flex items-center gap-1">
+            <a href="/drivers/dashboard" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="/drivers/scout-loads" class="bg-blue-600 text-white px-6 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
+                <i class="fas fa-satellite-dish"></i> Scout Loads
+            </a>
+            <a href="/drivers/load-board" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fas fa-radar"></i> Load Board
+            </a>
+            <a href="/drivers/uploads" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fas fa-file-upload"></i> Paperwork
+            </a>
+            <a href="/drivers/fleet" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition">
+                <i class="fas fa-truck-ramp-box"></i> Fleet
+            </a>
+            <button type="button" onclick="document.getElementById('help-drawer').classList.remove('translate-x-full')" class="text-slate-400 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                <i class="fas fa-question-circle"></i> Help
+            </button>
+        </div>
+    </nav>
+
+    {% include "drivers/partials/help_drawer.html" %}
+</body>
+</html>

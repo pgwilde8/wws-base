@@ -1,0 +1,78 @@
+<div class="space-y-6">
+    <div class="p-6 bg-slate-900/50 border border-slate-800 rounded-2xl">
+        <p class="text-slate-400 text-sm mb-3">Select the number of trucks. Setup is $25 per truck and includes $CANDLE credits for AI dispatch automation.</p>
+        <div class="bg-blue-900/30 border border-blue-700/50 rounded-lg p-4 mt-2">
+            <p class="text-xs text-blue-100">After payment, we&rsquo;ll email you your login. Log in at <strong>app.greencandledispatch.com</strong> when you&rsquo;re ready.</p>
+        </div>
+    </div>
+    <div class="bg-slate-900 border-2 border-dashed border-slate-700 rounded-2xl p-6">
+        <h3 class="text-green-400 font-bold mb-4 text-center">How many trucks?</h3>
+        <form id="payment-form" class="space-y-4 max-w-xs mx-auto">
+            <div>
+                <label for="truck_count" class="block text-[10px] text-slate-400 uppercase font-bold mb-1.5">Number of trucks</label>
+                <select name="truck_count" id="truck_count" class="w-full bg-slate-950 border-2 border-slate-600 p-3 rounded-lg text-center font-mono text-white focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <option value="1">1 truck — $25</option>
+                    <option value="2">2 trucks — $50</option>
+                    <option value="3">3 trucks — $75</option>
+                    <option value="4">4 trucks — $100</option>
+                    <option value="5">5 trucks — $125</option>
+                </select>
+            </div>
+            <div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700 text-center">
+                <p class="text-[10px] text-slate-500 uppercase font-bold mb-1">Total</p>
+                <p class="text-2xl font-black text-green-400"><span id="total-display">$25</span></p>
+                <p class="text-[9px] text-slate-500 mt-1">$25 × <span id="qty-display">1</span> truck<span id="qty-plural">s</span></p>
+            </div>
+            {% if error %}
+            <div id="payment-error" class="p-3 bg-red-900/40 border border-red-500/50 rounded-lg text-red-300 text-xs text-center">{{ error }}</div>
+            {% endif %}
+            <div class="mt-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                <label class="flex items-start gap-2 cursor-pointer text-xs text-slate-300">
+                    <input type="checkbox" id="agree-refund" class="mt-0.5 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500" required />
+                    <span>I understand the $25 setup fee is non-refundable after account activation. By proceeding, I agree to the terms of service.</span>
+                </label>
+            </div>
+            <div class="flex justify-center gap-3 mt-6">
+                <button type="button" id="btn-proceed" class="bg-green-600 hover:bg-green-500 text-white text-sm font-bold py-3 px-8 rounded-full transition active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-credit-card"></i>
+                    <span>Proceed to Payment</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+(function() {
+    var select = document.getElementById('truck_count');
+    var totalDisplay = document.getElementById('total-display');
+    var qtyDisplay = document.getElementById('qty-display');
+    var qtyPlural = document.getElementById('qty-plural');
+    var btn = document.getElementById('btn-proceed');
+    function updateDisplay() {
+        var qty = parseInt(select.value, 10) || 1;
+        totalDisplay.textContent = '$' + (qty * 25);
+        qtyDisplay.textContent = qty;
+        qtyPlural.textContent = qty === 1 ? '' : 's';
+    }
+    select.addEventListener('change', updateDisplay);
+    updateDisplay();
+    var agreeCheckbox = document.getElementById('agree-refund');
+    function updateButtonState() { if (btn && agreeCheckbox) btn.disabled = !agreeCheckbox.checked; }
+    if (agreeCheckbox) { agreeCheckbox.addEventListener('change', updateButtonState); updateButtonState(); }
+    if (btn) {
+        btn.addEventListener('click', function() {
+            if (!agreeCheckbox || !agreeCheckbox.checked) { alert('Please confirm you understand the refund policy before proceeding.'); return; }
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Redirecting...';
+            var truckCount = parseInt(select.value, 10) || 1;
+            fetch('/drivers/onboarding/create-setup-checkout', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: JSON.stringify({ truck_count: truckCount }), credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.url) window.location.href = data.url;
+                else { btn.disabled = false; btn.innerHTML = '<i class="fas fa-credit-card"></i> <span>Proceed to Payment</span>'; alert(data.error || 'Unable to start checkout. Please try again.'); }
+            })
+            .catch(function() { btn.disabled = false; btn.innerHTML = '<i class="fas fa-credit-card"></i> <span>Proceed to Payment</span>'; alert('Checkout failed. Please try again.'); });
+        });
+    }
+})();
+</script>

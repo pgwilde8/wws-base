@@ -129,7 +129,7 @@ def send_packet_to_factor(engine, load_id: str, trucker_id: int, user_id: int) -
         if final_rate <= 0:
             return {"ok": False, "message": "Invalid load rate.", "candle_reward": 0}
 
-        dispatch_fee = final_rate * 0.02
+        dispatch_fee = final_rate * 0.025
 
         # 3. Get user's factoring company
         user_row = conn.execute(

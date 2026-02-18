@@ -8,11 +8,11 @@ from app.models.negotiation import Negotiation, NegotiationStatus
 
 
 class RevenueService:
-    """Non-speculative buy pressure: 2% of WON load revenue = $CANDLE buyback."""
+    """Non-speculative buy pressure: 2.5% of WON load revenue = $CANDLE buyback."""
 
     @staticmethod
     def get_weekly_buyback_stats(db: Session) -> dict[str, Any]:
-        """Calculate total 'Win' revenue and the 2% network fee (for Transak buyback)."""
+        """Calculate total 'Win' revenue and the 2.5% network fee (for Transak buyback)."""
         try:
             stats = (
                 db.query(
@@ -29,7 +29,7 @@ class RevenueService:
                 "candle_buyback_usd": 0.0,
             }
         total_revenue = float(stats.total_revenue or 0.0)
-        network_fee = total_revenue * 0.02
+        network_fee = total_revenue * 0.025
         return {
             "win_count": stats.total_wins or 0,
             "total_revenue": total_revenue,
@@ -55,7 +55,7 @@ class RevenueService:
                 row = r.one()
                 total_revenue = float(row.total_revenue or 0)
                 win_count = row.total_wins or 0
-                candle_buyback_usd = round(total_revenue * 0.02, 2)
+                candle_buyback_usd = round(total_revenue * 0.025, 2)
                 return {
                     "win_count": win_count,
                     "total_revenue": total_revenue,

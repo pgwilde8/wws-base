@@ -1,5 +1,5 @@
 """
-Ledger Service: Service credits from the 2% dispatch fee.
+Ledger Service: Service credits from the 2.5% dispatch fee.
 SEC-safe: dollar-blind—uses fixed percentages only. No hardcoded $38 or $13.
 
 IMPORTANT: As of 2026, ALL $CANDLE service credits are IMMEDIATE-USE.
@@ -16,7 +16,7 @@ from typing import Dict, Any
 from sqlalchemy import text
 
 # --- GLOBAL CONSTANTS (SEC-SAFE, DOLLAR-BLIND) ---
-DISPATCH_FEE_RATE = Decimal("0.02")       # 2% of load paid to platform
+DISPATCH_FEE_RATE = Decimal("0.025")     # 2.5% of load paid to platform
 DRIVER_REBATE_RATIO = Decimal("0.2105")   # 21.05% of fee returned as service credits
 
 # Internal split (for reporting only):
@@ -27,7 +27,7 @@ AI_RESERVE_RATIO = Decimal("0.2105")        # 21.05%
 
 
 def _calculate_fee_split(total_paid: Decimal) -> Dict[str, Decimal]:
-    """Compute 2% fee, driver rebate, and infra allocation. Works for any load amount."""
+    """Compute 2.5% fee, driver rebate, and infra allocation. Works for any load amount."""
     actual_fee = total_paid * DISPATCH_FEE_RATE
     return {
         "gross_fee": actual_fee,
@@ -55,7 +55,7 @@ def process_load_settlement(
     total_paid_by_broker: float,
 ) -> Dict[str, Any]:
     """
-    Called when a load is settled (e.g. driver accepts). Calculates the 2% fee,
+    Called when a load is settled (e.g. driver accepts). Calculates the 2.5% fee,
     splits into operating buckets, and credits the driver's ledger.
 
     Returns: {gross_fee, credits_issued, credits_usd, infra_allocation}
@@ -121,7 +121,7 @@ def issue_load_credits(engine, trucker_id: int, load_id: str, load_amount: float
 
 def issue_service_credits(engine, trucker_id: int, load_id: str, total_paid: float) -> float:
     """
-    Issues immediate-use service credits (rebate from 2% fee).
+    Issues immediate-use service credits (rebate from 2.5% fee).
     No vesting. Available for automation immediately.
     Alias for issue_load_credits.
     """
