@@ -12,12 +12,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # One source of truth for all email variables
-MX_HOST = os.getenv("MXROUTE_SMTP_HOST", "fusion.mxrouting.net")
-MX_PORT = int(os.getenv("MXROUTE_SMTP_PORT", "465"))
-MX_USER = os.getenv("MXROUTE_SMTP_USER")
-MX_PASS = os.getenv("MXROUTE_SMTP_PASSWORD")
+# Support both MXROUTE_* and EMAIL_* variable names (EMAIL_* takes precedence if both exist)
+MX_HOST = os.getenv("EMAIL_HOST") or os.getenv("MXROUTE_SMTP_HOST", "fusion.mxrouting.net")
+MX_PORT = int(os.getenv("EMAIL_PORT") or os.getenv("MXROUTE_SMTP_PORT", "465"))
+MX_USER = os.getenv("EMAIL_USER") or os.getenv("MXROUTE_SMTP_USER")
+MX_PASS = os.getenv("EMAIL_PASS") or os.getenv("MXROUTE_SMTP_PASSWORD")
 EMAIL_DOMAIN = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
-MXROUTE_FROM_EMAIL = os.getenv("MXROUTE_FROM_EMAIL", "noreply@greencandledispatch.com")
+MXROUTE_FROM_EMAIL = os.getenv("MXROUTE_FROM_EMAIL") or os.getenv("EMAIL_USER") or "dispatch@gcdloads.com"
 
 # Alias the variables if you need the older names for compatibility
 MXROUTE_SMTP_HOST = MX_HOST
@@ -307,8 +308,8 @@ def send_bol_email(
     """
     from app.services.storage import get_object
     
-    if not MXROUTE_SMTP_USER or not MXROUTE_SMTP_PASSWORD:
-        return {"status": "error", "message": "SMTP credentials missing"}
+    if not MX_USER or not MX_PASS:
+        return {"status": "error", "message": "SMTP credentials missing (check EMAIL_USER and EMAIL_PASS in .env)"}
     
     try:
         # Download PDF from Spaces
@@ -345,7 +346,7 @@ The BOL PDF is attached.
         
         # Send email
         with smtplib.SMTP_SSL(MX_HOST, MX_PORT) as server:
-            server.login(MXROUTE_SMTP_USER, MXROUTE_SMTP_PASSWORD)
+            server.login(MX_USER, MX_PASS)
             server.send_message(msg, to_addrs=[to_email])
         
         return {

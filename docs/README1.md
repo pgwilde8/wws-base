@@ -30,10 +30,10 @@ Nginx config: /etc/nginx/sites-available/greencandledispatch.com (proxies to 127
 # git remote set-url origin https://YOUR_TOKEN@github.com/pgwilde8/dispatch.git
 
 git add -A
-git commit -m "bol1"
+git commit -m "image2pdf-ok"
 git push -u origin main
 
-http://134.199.241.56:8990/admin/login
+http://greencandledispatch.com/admin/login
 Email: admin@example.com
 Password: changeme123
 ---
