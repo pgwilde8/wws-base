@@ -220,19 +220,28 @@ Green Candle Dispatch
 
 
 def send_century_approval_email(driver_name: str, driver_email: str) -> Dict:
-    """Send congrats email when Century Finance approves driver."""
+    """Send welcome email when Century Finance approves driver. Uses existing login (no password in email)."""
     if not MX_USER or not MX_PASS:
         return {"status": "error", "message": "SMTP credentials missing"}
     from_email = os.getenv("FACTORING_FROM_EMAIL", f"referrals@{EMAIL_DOMAIN}")
+    base_url = (os.getenv("BASE_URL") or "https://greencandledispatch.com").rstrip("/")
+    login_url = f"{base_url}/login/client"
+    dashboard_url = f"{base_url}/drivers/dashboard"
     body = f"""Hi {driver_name},
 
-Alma at Century Finance has approved and signed you up for funding.
+Century Finance has approved you for funding. Your Green Candle Dispatch back office is now unlocked.
 
-Your full Green Candle Dispatch dashboard is now unlocked — start scouting loads, negotiating rates, and automating your dispatch today!
+Log in with the same email and password you used when you registered:
 
-Log in here: https://greencandledispatch.com/drivers/dashboard
+{login_url}
 
-If you have questions, reply here or reach Alma directly.
+After login you'll land on your dashboard. From there you can:
+• Open the Load Board to find and negotiate loads
+• When you WIN a load, go to Paperwork (or use "Manage" on the load) to upload your BOL, create the invoice, and send the packet to Century for funding
+
+Dashboard: {dashboard_url}
+
+If you have questions, reply here or reach Alma at Century directly.
 
 Welcome aboard!
 Green Candle Dispatch
@@ -241,7 +250,7 @@ Green Candle Dispatch
         msg = MIMEMultipart()
         msg["From"] = f"Green Candle Dispatch <{from_email}>"
         msg["To"] = driver_email
-        msg["Subject"] = "Congrats! You're Approved with Century Finance – Dashboard Unlocked!"
+        msg["Subject"] = "You're approved! Log in to your Green Candle Dispatch dashboard"
         msg["Reply-To"] = from_email
         msg.attach(MIMEText(body, "plain"))
         with smtplib.SMTP_SSL(MX_HOST, MX_PORT) as server:

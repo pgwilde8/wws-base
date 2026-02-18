@@ -1,11 +1,11 @@
-<div class="w-full bg-green-900/40 border-2 border-green-500/60 rounded-xl p-4 shadow-lg shadow-green-500/10">
+<div class="w-full bg-green-900/40 border-2 border-green-500/60 rounded-xl p-5 shadow-lg shadow-green-500/10">
     <div class="flex items-center gap-3">
         <div class="bg-green-500/30 p-2 rounded-full">
-            <i class="fas fa-paper-plane text-green-400 text-lg"></i>
+            <i class="fas fa-check-circle text-green-400 text-xl"></i>
         </div>
         <div>
-            <div class="text-green-400 font-black text-sm uppercase">Sent to Factoring</div>
-            <p class="text-slate-300 text-xs mt-1">{{ message }}</p>
+            <div class="text-green-400 font-black text-base">Packet sent to Century Finance – expect funding soon!</div>
+            <p class="text-slate-300 text-sm mt-1">{{ message }}</p>
             {% if final_rate and final_rate > 0 %}
             <p class="text-white font-bold text-sm mt-2">Est. funding: ${{ "{:,.2f}".format(final_rate) }}</p>
             {% endif %}

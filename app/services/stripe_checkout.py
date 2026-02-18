@@ -1,6 +1,6 @@
 """
-Stripe Checkout for Small Fleet Setup: $25/truck, quantity 1–5.
-Creates Checkout Session with dynamic price_data (no pre-created product needed).
+Stripe Checkout: Small Fleet Setup ($25/truck) and Add-On Products (Call Packs, Fuel Packs, Broker Subscription).
+Setup uses dynamic price_data; add-ons use pre-created Stripe Price IDs.
 """
 import os
 from typing import Optional
@@ -13,6 +13,17 @@ stripe.api_key = STRIPE_SECRET
 PRICE_PER_TRUCK_CENTS = 2500  # $25.00
 MIN_TRUCKS = 1
 MAX_TRUCKS = 5
+
+# Add-on product slugs -> Stripe Price IDs (env can override; defaults from Stripe dashboard)
+ADDON_PRICE_IDS = {
+    "call-pack-120": os.getenv("STRIPE_PRICE_CALL_120", "price_1T1Wg2RoeA6UINeR1IGbLNEW"),   # 120 min $49
+    "call-pack-300": os.getenv("STRIPE_PRICE_CALL_300", "price_1T1WhLRoeA6UINeR0qRIojxF"),   # 300 min $99
+    "call-pack-750": os.getenv("STRIPE_PRICE_CALL_750", "price_1T1WiMRoeA6UINeRUIpagpR6"),   # 750 min $199
+    "fuel-pack-starter": os.getenv("STRIPE_PRICE_FUEL_STARTER", "price_1T1WlIRoeA6UINeRIjEmRE2b"),  # 10 $CANDLE TBD
+    "fuel-pack-fleet": os.getenv("STRIPE_PRICE_FUEL_FLEET", "price_1T1Wm9RoeA6UINeREChn3oth"),      # 60 $CANDLE TBD
+    "broker-subscription": os.getenv("STRIPE_PRICE_BROKER_SUB", "price_1T1WngRoeA6UINeRxIZFB9m6"),   # $149/mo
+}
+ADDON_SUBSCRIPTION_SLUGS = frozenset({"broker-subscription"})
 
 
 def create_setup_checkout_session(
@@ -49,6 +60,31 @@ def create_setup_checkout_session(
                 "quantity": truck_count,
             }
         ],
+        success_url=success_url,
+        cancel_url=cancel_url,
+    )
+    return session.url if session else None
+
+
+def create_addon_checkout_session(
+    product_slug: str,
+    success_url: str,
+    cancel_url: str,
+) -> Optional[str]:
+    """
+    Create Stripe Checkout Session for an add-on product (Call Pack, Fuel Pack, or Broker Subscription).
+    product_slug: one of call-pack-120, call-pack-300, call-pack-750, fuel-pack-starter, fuel-pack-fleet, broker-subscription
+    Returns session.url for redirect, or None if slug/Stripe invalid.
+    """
+    if not STRIPE_SECRET:
+        return None
+    price_id = ADDON_PRICE_IDS.get(product_slug)
+    if not price_id:
+        return None
+    mode = "subscription" if product_slug in ADDON_SUBSCRIPTION_SLUGS else "payment"
+    session = stripe.checkout.Session.create(
+        mode=mode,
+        line_items=[{"price": price_id, "quantity": 1}],
         success_url=success_url,
         cancel_url=cancel_url,
     )

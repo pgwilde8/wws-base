@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Load {{ load.load_id }} | Green Candle</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #020617; }
+        .neon-glow { text-shadow: 0 0 8px rgba(59, 130, 246, 0.5); }
+    </style>
+</head>
+<body class="text-slate-200 font-sans pb-24">
+
+    <header class="p-6 bg-slate-900 border-b border-slate-800 sticky top-0 z-50 shadow-2xl">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <a href="/drivers/dashboard" class="text-slate-400 hover:text-white">
+                    <i class="fas fa-arrow-left text-xl"></i>
+                </a>
+                <div class="bg-green-600 p-3 rounded-2xl shadow-lg shadow-green-500/20">
+                    <i class="fas fa-file-invoice text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-black tracking-tighter text-white">MANAGE LOAD</h1>
+                    <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Load #{{ load.load_id }}</p>
+                    <p class="text-slate-400 text-sm">{{ load.origin }} → {{ load.destination }}</p>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-white font-mono font-bold text-xl">${{ "{:,.2f}".format(load.final_rate) }}</div>
+                {% if load.estimated_credits_candle and load.estimated_credits_candle > 0 %}
+                <div class="text-[10px] text-green-400">
+                    <i class="fas fa-coins mr-0.5"></i> ~{{ "%.1f"|format(load.estimated_credits_candle) }} $CANDLE to earn
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto p-6 space-y-6">
+
+        <!-- Missing Docs Banner -->
+        {% set missing_count = (0 if load.has_bol else 1) + (0 if load.has_invoice else 1) + (0 if load.has_ratecon else 1) %}
+        {% if missing_count > 0 %}
+        <div class="bg-amber-900/30 border border-amber-500/50 rounded-xl p-4 flex items-center gap-3">
+            <i class="fas fa-exclamation-triangle text-amber-400 text-xl"></i>
+            <div>
+                <span class="text-amber-200 font-bold">{{ missing_count }} document{% if missing_count != 1 %}s{% endif %} missing:</span>
+                <span class="text-slate-300 text-sm ml-1">
+                    {% if not load.has_bol %}Proof of Delivery (BOL){% endif %}
+                    {% if not load.has_invoice %}{% if not load.has_bol %}, {% endif %}Invoice{% endif %}
+                    {% if not load.has_ratecon %}{% if not load.has_bol or not load.has_invoice %}, {% endif %}RateCon{% endif %}
+                </span>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Section 1: BOL Upload -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-green-900/30 p-2 rounded-lg">
+                    <i class="fas fa-file-pdf text-green-400 text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-white font-bold text-lg">Bill of Lading</h2>
+                    <p class="text-slate-400 text-xs">Required - Auto-converts images to PDF</p>
+                </div>
+                {% if load.has_bol %}
+                <span class="ml-auto bg-green-900/40 text-green-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-green-500/50">
+                    <i class="fas fa-check-circle mr-1"></i>BOL: Uploaded & Processed
+                </span>
+                {% else %}
+                <span class="ml-auto bg-red-900/40 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold border border-red-500/50">
+                    <i class="fas fa-times-circle mr-1"></i>Missing
+                </span>
+                {% endif %}
+            </div>
+            
+            {% if load.has_bol and load.bol_presigned_url %}
+            <div class="mb-4 rounded-lg overflow-hidden bg-slate-800 border border-slate-700">
+                <div class="p-2 flex items-center justify-between bg-slate-800/50">
+                    <span class="text-slate-400 text-xs font-bold">Preview</span>
+                    <a href="{{ load.bol_presigned_url }}" target="_blank" rel="noopener" class="text-blue-400 hover:text-blue-300 text-xs font-bold">
+                        <i class="fas fa-external-link-alt mr-1"></i>Open PDF
+                    </a>
+                </div>
+                <iframe src="{{ load.bol_presigned_url }}#toolbar=0" class="w-full h-64 bg-slate-900" title="BOL PDF"></iframe>
+            </div>
+            {% endif %}
+            
+            <div id="bol-upload-result-{{ load.load_id }}" class="mb-4"></div>
+            
+            {% if not load.has_bol %}
+            <form hx-post="/drivers/loads/{{ load.load_id }}/upload-document"
+                  hx-target="#bol-upload-result-{{ load.load_id }}"
+                  hx-swap="innerHTML"
+                  hx-encoding="multipart/form-data"
+                  hx-indicator="#bol-spinner-{{ load.load_id }}"
+                  class="flex gap-3 items-end">
+                <input type="hidden" name="doc_type" value="BOL" />
+                <label class="cursor-pointer flex-1 inline-flex items-center gap-2 bg-green-700/80 hover:bg-green-600 text-white font-bold px-4 py-3 rounded-lg transition">
+                    <i class="fas fa-file-upload"></i>
+                    <span>Choose BOL (image or PDF)</span>
+                    <input type="file" name="file" accept="image/*,.pdf" class="hidden" required />
+                </label>
+                <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold px-6 py-3 rounded-lg transition">
+                    <i class="fas fa-paper-plane mr-1"></i> Upload
+                </button>
+            </form>
+            <div id="bol-spinner-{{ load.load_id }}" class="htmx-indicator text-slate-500 text-xs mt-2">
+                <i class="fas fa-spinner fa-spin mr-1"></i> Processing...
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Section 2: Other Documents -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-blue-900/30 p-2 rounded-lg">
+                    <i class="fas fa-folder-open text-blue-400 text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-white font-bold text-lg">Other Documents</h2>
+                    <p class="text-slate-400 text-xs">RateCon, Lumper, Fuel receipts, etc.</p>
+                </div>
+            </div>
+
+            <!-- Document Status List -->
+            <div class="space-y-3 mb-4">
+                {% for doc_type, doc_name, has_doc in load.documents_status %}
+                <div class="flex items-center justify-between bg-slate-800/50 p-3 rounded-lg">
+                    <div class="flex items-center gap-2">
+                        {% if has_doc %}
+                        <i class="fas fa-check-circle text-green-400"></i>
+                        {% else %}
+                        <i class="fas fa-circle text-slate-600"></i>
+                        {% endif %}
+                        <span class="text-slate-300 text-sm">{{ doc_name }}</span>
+                    </div>
+                    {% if has_doc %}
+                    <span class="text-green-400 text-xs font-bold">Uploaded</span>
+                    {% else %}
+                    <button onclick="showUploadModal('{{ doc_type }}', '{{ doc_name }}')" 
+                            class="text-blue-400 hover:text-blue-300 text-xs font-bold">
+                        Upload
+                    </button>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Custom Document Upload -->
+            <div class="border-t border-slate-800 pt-4">
+                <button onclick="showCustomUploadModal()" 
+                        class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 px-4 rounded-lg transition text-sm">
+                    <i class="fas fa-plus mr-2"></i>Upload Custom Document
+                </button>
+            </div>
+        </div>
+
+        <!-- Section 3: Invoice Generation -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-purple-900/30 p-2 rounded-lg">
+                    <i class="fas fa-file-invoice-dollar text-purple-400 text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-white font-bold text-lg">Invoice</h2>
+                    <p class="text-slate-400 text-xs">Generate invoice from driver to broker</p>
+                </div>
+                {% if load.has_invoice %}
+                <span class="ml-auto bg-green-900/30 text-green-400 px-3 py-1 rounded-lg text-xs font-bold">
+                    <i class="fas fa-check-circle mr-1"></i>Generated
+                </span>
+                {% endif %}
+            </div>
+
+            {% if not load.has_invoice %}
+            <div id="invoice-error-{{ load.load_id }}" class="hidden mb-4 bg-red-900/30 border border-red-500/50 rounded-lg p-3 text-red-300 text-sm">
+                <i class="fas fa-exclamation-circle mr-2"></i><span id="invoice-error-text">Broker MC# is required.</span>
+            </div>
+            <form id="invoice-form-{{ load.load_id }}" 
+                  hx-post="/drivers/loads/{{ load.load_id }}/generate-invoice"
+                  hx-target="#invoice-result-{{ load.load_id }}"
+                  hx-swap="innerHTML"
+                  class="space-y-4">
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-2 font-bold">Broker MC# <span class="text-red-400">*</span></label>
+                        <input type="text" 
+                               id="broker-mc-{{ load.load_id }}"
+                               name="broker_mc" 
+                               value="{% if load.broker_mc %}{{ load.broker_mc }}{% endif %}"
+                               required
+                               placeholder="123456"
+                               class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-4 py-2 text-sm focus:border-green-500 focus:outline-none invalid:border-red-500" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-2 font-bold">Broker Name</label>
+                        <input type="text" 
+                               name="broker_name" 
+                               value="{% if load.broker_name %}{{ load.broker_name }}{% endif %}"
+                               placeholder="Broker Company Name"
+                               class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-4 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-2 font-bold">Broker Address</label>
+                        <input type="text" 
+                               name="broker_address" 
+                               value="{% if load.broker_address %}{{ load.broker_address }}{% endif %}"
+                               placeholder="123 Broker St, City, State ZIP"
+                               class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-4 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-2 font-bold">Payment Terms</label>
+                        <input type="text" 
+                               name="payment_terms" 
+                               value="Net 30"
+                               placeholder="Net 30"
+                               class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-4 py-2 text-sm focus:border-green-500 focus:outline-none" />
+                    </div>
+                </div>
+                <button type="submit" 
+                        id="invoice-submit-{{ load.load_id }}"
+                        class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-lg transition">
+                    <i class="fas fa-file-invoice-dollar mr-2"></i> Generate Invoice
+                </button>
+            </form>
+            <script>
+            (function() {
+                var form = document.getElementById('invoice-form-{{ load.load_id }}');
+                var brokerMc = document.getElementById('broker-mc-{{ load.load_id }}');
+                var errDiv = document.getElementById('invoice-error-{{ load.load_id }}');
+                var errText = document.getElementById('invoice-error-text');
+                if (form) {
+                    form.addEventListener('submit', function(e) {
+                        var val = (brokerMc && brokerMc.value) ? brokerMc.value.trim() : '';
+                        if (!val) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (errDiv) { errDiv.classList.remove('hidden'); errText.textContent = 'Broker MC# is required.'; }
+                            if (brokerMc) brokerMc.focus();
+                            return false;
+                        }
+                        if (errDiv) errDiv.classList.add('hidden');
+                    });
+                }
+            })();
+            </script>
+            {% else %}
+            <div class="bg-green-900/30 border border-green-500/50 rounded-lg p-4">
+                <div class="flex items-center gap-2 text-green-400 mb-2">
+                    <i class="fas fa-check-circle"></i>
+                    <span class="font-bold">Invoice Generated</span>
+                </div>
+                <a href="/drivers/loads/{{ load.load_id }}/download-invoice" 
+                   class="inline-block mt-2 text-blue-400 hover:text-blue-300 text-sm underline">
+                    <i class="fas fa-download mr-1"></i>Download Invoice PDF
+                </a>
+            </div>
+            {% endif %}
+            <div id="invoice-result-{{ load.load_id }}" class="mt-4"></div>
+        </div>
+
+        <!-- Section 4: Factoring Packet -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="bg-amber-900/30 p-2 rounded-lg">
+                    <i class="fas fa-university text-amber-400 text-xl"></i>
+                </div>
+                <div>
+                    <h2 class="text-white font-bold text-lg">Send to Century Finance</h2>
+                    <p class="text-slate-400 text-xs">Complete funding packet (Costs 0.3 $CANDLE)</p>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/50 rounded-lg p-4 mb-4">
+                <div class="text-xs text-slate-400 mb-2 font-bold">Packet includes:</div>
+                <ul class="space-y-1 text-sm">
+                    <li class="flex items-center gap-2">
+                        {% if load.has_bol %}
+                        <i class="fas fa-check-circle text-green-400"></i>
+                        {% else %}
+                        <i class="fas fa-circle text-slate-600"></i>
+                        {% endif %}
+                        <span class="text-slate-300">BOL</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        {% if load.has_ratecon %}
+                        <i class="fas fa-check-circle text-green-400"></i>
+                        {% else %}
+                        <i class="fas fa-circle text-slate-600"></i>
+                        {% endif %}
+                        <span class="text-slate-300">RateCon (optional)</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        {% if load.has_invoice %}
+                        <i class="fas fa-check-circle text-green-400"></i>
+                        {% else %}
+                        <i class="fas fa-circle text-slate-600"></i>
+                        {% endif %}
+                        <span class="text-slate-300">Invoice</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <i class="fas fa-check-circle text-green-400"></i>
+                        <span class="text-slate-300">Cover Page</span>
+                    </li>
+                </ul>
+            </div>
+
+            {% if load.has_bol and load.has_invoice %}
+            <form hx-post="/drivers/loads/{{ load.load_id }}/send-to-factoring"
+                  hx-target="#factoring-result-{{ load.load_id }}"
+                  hx-swap="innerHTML"
+                  class="space-y-3">
+                <button type="submit" 
+                        class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-6 rounded-lg transition">
+                    <i class="fas fa-paper-plane mr-2"></i> Generate & Send Packet
+                </button>
+            </form>
+            {% elif load.has_bol %}
+            <div class="bg-amber-900/30 border border-amber-500/50 rounded-lg p-4 text-amber-200 text-sm">
+                <i class="fas fa-info-circle mr-2"></i>Generate an invoice above before sending the packet to Century Finance.
+            </div>
+            {% else %}
+            <div class="bg-red-900/30 border border-red-500/50 rounded-lg p-4 text-red-300 text-sm">
+                <i class="fas fa-exclamation-circle mr-2"></i>Upload BOL first before sending to factoring.
+            </div>
+            {% endif %}
+            <div id="factoring-result-{{ load.load_id }}" class="mt-4"></div>
+        </div>
+
+        <!-- Back Button -->
+        <div class="text-center">
+            <a href="/drivers/uploads" 
+               class="inline-block text-slate-400 hover:text-white text-sm">
+                <i class="fas fa-arrow-left mr-2"></i>Back to All Loads
+            </a>
+        </div>
+    </main>
+
+    <!-- Upload Modal (for other documents) -->
+    <div id="upload-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-white font-bold text-lg" id="modal-title">Upload Document</h3>
+                <button onclick="closeUploadModal()" class="text-slate-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="modal-upload-form"
+                  hx-post="/drivers/loads/{{ load.load_id }}/upload-document"
+                  hx-target="#upload-result-modal"
+                  hx-swap="innerHTML"
+                  hx-encoding="multipart/form-data"
+                  class="space-y-4">
+                <input type="hidden" name="doc_type" id="modal-doc-type" />
+                <div>
+                    <label class="block text-xs text-slate-400 mb-2 font-bold">Document Label</label>
+                    <input type="text" 
+                           id="modal-doc-label"
+                           readonly
+                           class="w-full rounded-lg bg-slate-800 border border-slate-700 text-white px-4 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-2 font-bold">File</label>
+                    <label class="cursor-pointer flex items-center gap-2 bg-green-700/80 hover:bg-green-600 text-white font-bold px-4 py-3 rounded-lg transition">
+                        <i class="fas fa-file-upload"></i>
+                        <span>Choose File</span>
+                        <input type="file" name="file" accept="image/*,.pdf" class="hidden" required />
+                    </label>
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" 
+                            onclick="closeUploadModal()"
+                            class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-2 px-4 rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-lg transition">
+                        Upload
+                    </button>
+                </div>
+            </form>
+            <div id="upload-result-modal" class="mt-4"></div>
+        </div>
+    </div>
+
+    <script>
+        function showUploadModal(docType, docName) {
+            document.getElementById('modal-doc-type').value = docType;
+            document.getElementById('modal-doc-label').value = docName;
+            document.getElementById('modal-title').textContent = 'Upload ' + docName;
+            document.getElementById('upload-modal').classList.remove('hidden');
+        }
+        
+        function showCustomUploadModal() {
+            document.getElementById('modal-doc-type').value = 'OTHER';
+            document.getElementById('modal-doc-label').value = '';
+            document.getElementById('modal-doc-label').removeAttribute('readonly');
+            document.getElementById('modal-title').textContent = 'Upload Custom Document';
+            document.getElementById('upload-modal').classList.remove('hidden');
+        }
+        
+        function closeUploadModal() {
+            document.getElementById('upload-modal').classList.add('hidden');
+            document.getElementById('modal-upload-form').reset();
+            document.getElementById('upload-result-modal').innerHTML = '';
+        }
+
+        // Refresh page after successful upload
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            if (event.detail.target.id && event.detail.target.id.includes('upload-result')) {
+                setTimeout(() => {
+                    if (event.detail.target.innerHTML.includes('success') || event.detail.target.innerHTML.includes('Success')) {
+                        window.location.reload();
+                    }
+                }, 1500);
+            }
+        });
+    </script>
+</body>
+</html>

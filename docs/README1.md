@@ -30,7 +30,7 @@ Nginx config: /etc/nginx/sites-available/greencandledispatch.com (proxies to 127
 # git remote set-url origin https://YOUR_TOKEN@github.com/pgwilde8/dispatch.git
 
 git add -A
-git commit -m "image2pdf-ok"
+git commit -m "image2pdf-ok2"
 git push -u origin main
 
 http://greencandledispatch.com/admin/login
@@ -162,9 +162,16 @@ Use the FMCSA API to enrich all 25k with phone and address.
 Use DAT + Truckstop to get the correct per-load contact when you actually see a posting, and capture those over time if you want a richer dispatch contact DB.
 That’s about $90–95/mo for both boards plus free FMCSA enrichment, and matches what you’re trying to do
  
- Call Pack – 120 min – $49= prod_TzVhUguxTHic75, price_1T1Wg2RoeA6UINeR1IGbLNEW
+Call Pack – 120 min – $49= prod_TzVhUguxTHic75, price_1T1Wg2RoeA6UINeR1IGbLNEW
 Call Pack – 300 min – $99=prod_TzVirBazpghaHG, price_1T1WhLRoeA6UINeR0qRIojxF
 Call Pack – 750 min – $199=prod_TzVjeSmqO34zi6, price_1T1WiMRoeA6UINeRUIpagpR6
 Fuel Pack – Starter (e.g. 10 $CANDLE) – TBD=prod_TzVme0pF6B6PUU, price_1T1WlIRoeA6UINeRIjEmRE2b
 Fuel Pack – Fleet (e.g. 60 $CANDLE) – TBD=prod_TzVnXd5W7tIdMb, price_1T1Wm9RoeA6UINeREChn3oth
 Broker Subscription – $149/mo=prod_TzVp8mtHTPAfY8, price_1T1WngRoeA6UINeRxIZFB9m6
+
+drivers section after approval
+
+/drivers/dashboard
+/drivers/load-board
+/drivers/fleet
+/drivers/terminal 404 and takes us out of drivers section

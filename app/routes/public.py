@@ -68,8 +68,24 @@ def pricing_page(request: Request):
 
 @router.get("/pricing/products")
 def pricing_products_page(request: Request):
-    """Secondary pricing page: Call Packs, Fuel Packs, Broker Subscription. Stripe links TBD."""
+    """Secondary pricing page: Call Packs, Fuel Packs, Broker Subscription. Stripe price IDs from env/code."""
     return templates.TemplateResponse("public/pricing-products.html", {"request": request})
+
+
+@router.get("/pricing/checkout")
+def pricing_checkout_redirect(request: Request, product: str = ""):
+    """Start Stripe Checkout for an add-on product. Redirects to Stripe or back to products page on failure."""
+    product_slug = (product or "").strip().lower()
+    base_url = (os.getenv("BASE_URL") or str(request.base_url)).rstrip("/")
+    success_url = f"{base_url}/pricing/products?success=1"
+    cancel_url = f"{base_url}/pricing/products?canceled=1"
+    from app.services.stripe_checkout import create_addon_checkout_session, ADDON_PRICE_IDS
+    if product_slug not in ADDON_PRICE_IDS:
+        return RedirectResponse(url="/pricing/products?error=invalid", status_code=303)
+    checkout_url = create_addon_checkout_session(product_slug, success_url, cancel_url)
+    if not checkout_url:
+        return RedirectResponse(url=f"/contact?product={product_slug}", status_code=303)
+    return RedirectResponse(url=checkout_url, status_code=303)
 
 
 @router.get("/test/bol-upload")

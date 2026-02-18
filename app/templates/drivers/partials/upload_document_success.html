@@ -3,10 +3,15 @@
         <i class="fas fa-check-circle text-lg"></i>
         <span class="font-bold">{{ doc_type }} uploaded successfully!</span>
     </div>
-    <a href="{{ file_url }}" target="_blank" rel="noopener" class="text-xs text-blue-400 hover:underline mt-2 block truncate">
-        {{ file_url }}
-    </a>
-    <div class="mt-3 flex gap-2" id="upload-actions-{{ load_id }}">
+    <div class="mt-3 flex gap-2 items-center">
+        <a href="{{ file_url }}" target="_blank" rel="noopener" class="text-sm text-blue-400 hover:text-blue-300 font-bold inline-flex items-center gap-1">
+            <i class="fas fa-external-link-alt"></i> View PDF
+        </a>
         <span class="text-slate-500 text-xs">Document saved to your load record.</span>
     </div>
+    {% if doc_type == 'BOL' and file_url %}
+    <div class="mt-3 rounded-lg overflow-hidden bg-slate-800 border border-slate-700">
+        <iframe src="{{ file_url }}#toolbar=0" class="w-full h-48 bg-slate-900" title="BOL Preview"></iframe>
+    </div>
+    {% endif %}
 </div>

@@ -15,8 +15,9 @@ from app.services.beta_activation import update_beta_activity, STAGE_LOGGED_IN, 
 from app.services.ai_agent import AIAgentService
 from app.services.negotiation import save_negotiation
 from app.services.payments import RevenueService
-from app.services.storage import upload_bol, upload_load_document, get_presigned_url
+from app.services.storage import upload_bol, upload_load_document, get_presigned_url, save_processed_bol
 from app.services.factoring import push_invoice_to_factor, send_packet_to_factor
+from app.services.invoice import generate_invoice_pdf
 from app.services.tokenomics import credit_driver_savings
 from app.services.buyback_notifications import BuybackNotificationService
 from app.services.email import send_negotiation_email, send_factoring_referral_email
@@ -147,6 +148,95 @@ def dashboard_legacy(request: Request, user: Optional[Dict] = Depends(current_us
 def dashboard2_redirect(request: Request):
     """Redirect to canonical dashboard URL."""
     return RedirectResponse(url="/drivers/dashboard", status_code=303)
+
+
+@router.get("/drivers/loads/{load_id}/manage", response_class=HTMLResponse)
+def load_manage_page(load_id: str, request: Request, user: Optional[Dict] = Depends(current_user)):
+    """Unified load management page - BOL upload, other docs, invoice generation, factoring packet."""
+    if not user or user.get("role") != "client":
+        return RedirectResponse(url="/login/client", status_code=303)
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not available")
+    
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT tp.id FROM webwise.trucker_profiles tp WHERE tp.user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            return RedirectResponse(url="/drivers/onboarding/welcome", status_code=303)
+        trucker_id = row[0]
+        
+        # Get load details (broker columns optional - may not exist on negotiations yet)
+        neg = conn.execute(
+            text("""
+                SELECT n.load_id, n.origin, n.destination, n.final_rate, n.created_at, n.factoring_status
+                FROM webwise.negotiations n
+                WHERE n.load_id = :load_id AND n.trucker_id = :tid AND n.status = 'won'
+            """),
+            {"load_id": load_id, "tid": trucker_id},
+        ).first()
+        if not neg:
+            raise HTTPException(status_code=404, detail="Load not found or not yours")
+        
+        # Get document status and BOL presigned URL for preview
+        docs = conn.execute(
+            text("""
+                SELECT doc_type, bucket, file_key FROM webwise.load_documents
+                WHERE load_id = :load_id AND trucker_id = :tid
+            """),
+            {"load_id": load_id, "tid": trucker_id},
+        ).fetchall()
+        doc_types = {r.doc_type for r in docs}
+        bol_bucket = bol_key = None
+        for r in docs:
+            if r.doc_type == "BOL" and getattr(r, "bucket", None) and getattr(r, "file_key", None):
+                bol_bucket, bol_key = r.bucket, r.file_key
+                break
+        
+        # Check for invoice
+        has_invoice = "INVOICE" in doc_types or any("invoice" in d.lower() for d in doc_types)
+        
+        # Document status list
+        documents_status = [
+            ("RATECON", "Rate Confirmation", "RATECON" in doc_types),
+            ("LUMPER", "Lumper Receipt", "LUMPER" in doc_types),
+            ("FUEL", "Fuel Receipt", "FUEL" in doc_types),
+        ]
+        
+        final_rate = float(neg.final_rate or 0)
+        credits = estimate_credits_for_load(final_rate)
+        
+        # BOL presigned URL for thumbnail/preview
+        bol_presigned_url = None
+        if bol_bucket and bol_key:
+            try:
+                bol_presigned_url = get_presigned_url(bol_bucket, bol_key)
+            except Exception:
+                pass
+        
+        load_data = {
+            "load_id": load_id,
+            "origin": neg.origin or "Unknown",
+            "destination": neg.destination or "Unknown",
+            "final_rate": final_rate,
+            "created_at": neg.created_at,
+            "estimated_credits_candle": credits.get("credits_candle", 0),
+            "has_bol": "BOL" in doc_types,
+            "has_ratecon": "RATECON" in doc_types,
+            "has_invoice": has_invoice,
+            "factoring_status": getattr(neg, "factoring_status", None) or "",
+            "broker_name": "",
+            "broker_mc": "",
+            "broker_address": "",
+            "documents_status": documents_status,
+            "bol_presigned_url": bol_presigned_url,
+        }
+    
+    return templates.TemplateResponse(
+        "drivers/load_manage.html",
+        {"request": request, "load": load_data},
+    )
 
 
 @router.get("/drivers/uploads", response_class=HTMLResponse)
@@ -663,7 +753,7 @@ def onboarding_welcome(request: Request, user: Optional[Dict] = Depends(current_
     if not user or user.get("role") != "client":
         return RedirectResponse(url="/login/client", status_code=303)
     email_domain = os.getenv("EMAIL_DOMAIN", "gcdloads.com")
-    # Check profile: if needs step 1 (create email), render it directly so it's always visible
+    driver_name = "Driver"
     needs_step1 = True
     if engine:
         try:
@@ -673,7 +763,10 @@ def onboarding_welcome(request: Request, user: Optional[Dict] = Depends(current_
                     {"uid": user.get("id")},
                 ).first()
             if row:
-                has_handle = bool((row[0] or "").strip())
+                display_name = (row[0] or "").strip()
+                if display_name:
+                    driver_name = display_name.split()[0] if display_name else "Driver"  # First name only
+                has_handle = bool(display_name)
                 has_mc = bool((row[1] or "").strip() or (row[2] or "").strip())
                 if has_handle and has_mc:
                     needs_step1 = False  # Will load step 2/3 or active load via HTMX
@@ -681,7 +774,7 @@ def onboarding_welcome(request: Request, user: Optional[Dict] = Depends(current_
             pass
     return templates.TemplateResponse(
         "drivers/onboarding_welcome.html",
-        {"request": request, "email_domain": email_domain, "needs_step1": needs_step1},
+        {"request": request, "email_domain": email_domain, "needs_step1": needs_step1, "driver_name": driver_name},
     )
 
 
@@ -1120,6 +1213,20 @@ def dashboard_mission(request: Request, user: Optional[Dict] = Depends(current_u
             "drivers/partials/onboarding_step3.html",
             {"request": request, "balance": balance, "display_name": (row.display_name or "").strip(), "email_domain": email_domain},
         )
+    # On welcome page, show a clear CTA when there's no active load instead of the minimal "No Active Loads" box
+    if request.query_params.get("onboarding") == "1" and row:
+        with engine.begin() as conn:
+            has_won = conn.execute(
+                text("SELECT 1 FROM webwise.negotiations WHERE trucker_id = :tid AND status = 'won' LIMIT 1"),
+                {"tid": row.id},
+            ).first()
+        if not has_won:
+            base = str(request.base_url).rstrip("/")
+            dashboard_url = f"{base}/drivers/dashboard"
+            return templates.TemplateResponse(
+                "drivers/partials/onboarding_no_load_yet.html",
+                {"request": request, "dashboard_url": dashboard_url},
+            )
     return active_load(request, user)
 
 
@@ -2091,7 +2198,7 @@ async def driver_upload_document(
     if not engine:
         raise HTTPException(status_code=500, detail="Database not available")
     doc_type = (doc_type or "BOL").strip().upper()
-    if doc_type not in ("BOL", "RATECON", "LUMPER"):
+    if doc_type not in ("BOL", "RATECON", "LUMPER", "FUEL", "OTHER"):
         doc_type = "BOL"
 
     with engine.begin() as conn:
@@ -2177,6 +2284,144 @@ async def driver_upload_document(
     )
     resp.headers["HX-Trigger"] = "bolUploaded, dashboardActiveLoadsRefresh"
     return resp
+
+
+@router.post("/drivers/loads/{load_id}/generate-invoice", response_class=HTMLResponse)
+def generate_invoice(
+    load_id: str,
+    request: Request,
+    broker_mc: str = Form(...),
+    broker_name: str = Form(""),
+    broker_address: str = Form(""),
+    payment_terms: str = Form("Net 30"),
+    user: Optional[Dict] = Depends(current_user),
+):
+    """Generate invoice PDF from driver to broker."""
+    if not user or user.get("role") != "client":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not available")
+    
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT tp.id, tp.display_name, tp.mc_number, tp.dot_number FROM webwise.trucker_profiles tp WHERE tp.user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            raise HTTPException(status_code=403, detail="Trucker profile not found")
+        trucker_id = row[0]
+        driver_name = row[1] or "Driver"
+        driver_mc = row[2] or row[3] or "N/A"
+        
+        neg = conn.execute(
+            text("""
+                SELECT n.final_rate, n.origin, n.destination, n.broker_name, n.broker_mc, n.broker_address
+                FROM webwise.negotiations n
+                WHERE n.load_id = :load_id AND n.trucker_id = :tid AND n.status = 'won'
+            """),
+            {"load_id": load_id, "tid": trucker_id},
+        ).first()
+        if not neg:
+            raise HTTPException(status_code=404, detail="Load not found or not yours")
+        
+        final_rate = float(neg.final_rate or 0)
+        origin = neg.origin or "Unknown"
+        destination = neg.destination or "Unknown"
+        
+        # Use provided broker info or fallback to negotiation data
+        broker_name_final = broker_name.strip() or getattr(neg, "broker_name", None) or "Broker"
+        broker_mc_final = broker_mc.strip() or getattr(neg, "broker_mc", None) or "N/A"
+        broker_address_final = broker_address.strip() or getattr(neg, "broker_address", None) or ""
+        
+        # Get driver address (if available)
+        driver_address = None  # Could add to trucker_profiles later
+    
+    # Generate invoice PDF
+    try:
+        pdf_bytes = generate_invoice_pdf(
+            driver_name=driver_name,
+            driver_mc=driver_mc,
+            driver_address=driver_address,
+            broker_name=broker_name_final,
+            broker_mc=broker_mc_final,
+            broker_address=broker_address_final,
+            load_id=load_id,
+            origin=origin,
+            destination=destination,
+            rate=final_rate,
+            payment_terms=payment_terms,
+        )
+        
+        # Save to Spaces
+        bucket, file_key = save_processed_bol(pdf_bytes, driver_mc, load_id, filename_suffix="invoice")
+        
+        # Save to load_documents (replace if exists)
+        with engine.begin() as conn:
+            # Delete existing invoice if any
+            conn.execute(
+                text("DELETE FROM webwise.load_documents WHERE load_id = :load_id AND trucker_id = :tid AND doc_type = 'INVOICE'"),
+                {"load_id": load_id, "tid": trucker_id},
+            )
+            # Insert new invoice
+            conn.execute(
+                text("""
+                    INSERT INTO webwise.load_documents (load_id, trucker_id, doc_type, file_url, bucket, file_key, processed)
+                    VALUES (:load_id, :tid, 'INVOICE', NULL, :bucket, :file_key, true)
+                """),
+                {"load_id": load_id, "tid": trucker_id, "bucket": bucket, "file_key": file_key},
+            )
+        
+        presigned_url = get_presigned_url(bucket, file_key)
+        
+        return templates.TemplateResponse(
+            "drivers/partials/invoice_generated.html",
+            {
+                "request": request,
+                "load_id": load_id,
+                "presigned_url": presigned_url,
+                "broker_name": broker_name_final,
+            },
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return HTMLResponse(
+            content=f'<div class="bg-red-900/30 border border-red-500/50 rounded-lg p-4 text-red-300">Error generating invoice: {str(e)}</div>',
+            status_code=500,
+        )
+
+
+@router.get("/drivers/loads/{load_id}/download-invoice", response_class=HTMLResponse)
+def download_invoice(load_id: str, user: Optional[Dict] = Depends(current_user)):
+    """Download invoice PDF."""
+    if not user or user.get("role") != "client":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if not engine:
+        raise HTTPException(status_code=500, detail="Database not available")
+    
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT tp.id FROM webwise.trucker_profiles tp WHERE tp.user_id = :uid"),
+            {"uid": user.get("id")},
+        ).first()
+        if not row:
+            raise HTTPException(status_code=403, detail="Trucker profile not found")
+        trucker_id = row[0]
+        
+        doc = conn.execute(
+            text("""
+                SELECT bucket, file_key FROM webwise.load_documents
+                WHERE load_id = :load_id AND trucker_id = :tid AND doc_type = 'INVOICE'
+                ORDER BY created_at DESC LIMIT 1
+            """),
+            {"load_id": load_id, "tid": trucker_id},
+        ).first()
+        
+        if not doc:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        
+        presigned_url = get_presigned_url(doc.bucket, doc.file_key)
+        return RedirectResponse(url=presigned_url, status_code=303)
 
 
 @router.post("/drivers/loads/{load_id}/send-to-factoring", response_class=HTMLResponse)
