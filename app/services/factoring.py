@@ -69,10 +69,10 @@ def send_packet_to_factor(engine, load_id: str, trucker_id: int, user_id: int) -
         return {"ok": False, "message": "Missing parameters", "candle_reward": 0}
 
     with engine.begin() as conn:
-        # 1. Gather documents (BOL required; RateCon optional)
+        # 1. Gather documents (BOL required; RateCon optional). Prefer bucket+key; fallback to file_url.
         doc_rows = conn.execute(
             text("""
-                SELECT doc_type, file_url FROM webwise.load_documents
+                SELECT doc_type, file_url, bucket, file_key FROM webwise.load_documents
                 WHERE load_id = :load_id AND trucker_id = :tid
                 AND doc_type IN ('BOL', 'RATECON')
                 ORDER BY doc_type, created_at DESC
@@ -80,8 +80,15 @@ def send_packet_to_factor(engine, load_id: str, trucker_id: int, user_id: int) -
             {"load_id": load_id, "tid": trucker_id},
         ).fetchall()
 
-    bol_urls = [r.file_url for r in doc_rows if r.doc_type == "BOL"]
-    ratecon_urls = [r.file_url for r in doc_rows if r.doc_type == "RATECON"]
+    from app.services.storage import get_presigned_url
+
+    def doc_url(r):
+        if getattr(r, "bucket", None) and getattr(r, "file_key", None):
+            return get_presigned_url(r.bucket, r.file_key)
+        return r.file_url
+
+    bol_urls = [doc_url(r) for r in doc_rows if r.doc_type == "BOL"]
+    ratecon_urls = [doc_url(r) for r in doc_rows if r.doc_type == "RATECON"]
 
     if not bol_urls:
         return {"ok": False, "message": "Upload BOL first before sending to factoring.", "candle_reward": 0}

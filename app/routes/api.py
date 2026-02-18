@@ -1,12 +1,13 @@
 """
 API routes for external integrations (Chrome Extension Scout, etc.).
 """
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Query
 from typing import Optional
 
 from app.schemas.scout import ScoutUpdate
 from app.core.deps import engine
 from app.services.beta_activation import update_beta_activity, STAGE_FIRST_SCOUT
+from app.services.storage import get_object
 from sqlalchemy import text
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -68,3 +69,29 @@ async def scout_heartbeat(
         raise HTTPException(status_code=500, detail=str(e))
 
     return {"status": "received"}
+
+
+@router.get("/health/spaces-retrieve")
+def spaces_retrieve_test(
+    bucket: str = Query("greencandle", description="Spaces bucket name"),
+    key: str = Query("dispatch/raw/bol/bol-1.pdf", description="Object key (e.g. dispatch/raw/bol/bol-1.pdf)"),
+):
+    """
+    Production-readiness test: retrieve a file from Spaces using boto3 get_object.
+    If this works, your pipeline is ready for OCR and factoring packet generation.
+    Returns JSON with success, size_bytes, and bucket/key.
+    """
+    try:
+        body = get_object(bucket, key)
+        return {
+            "ok": True,
+            "message": "Spaces retrieve OK",
+            "bucket": bucket,
+            "key": key,
+            "size_bytes": len(body),
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Spaces retrieve failed: {type(e).__name__}: {str(e)}",
+        )

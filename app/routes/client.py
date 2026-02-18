@@ -15,7 +15,7 @@ from app.services.beta_activation import update_beta_activity, STAGE_LOGGED_IN, 
 from app.services.ai_agent import AIAgentService
 from app.services.negotiation import save_negotiation
 from app.services.payments import RevenueService
-from app.services.storage import upload_bol, upload_load_document
+from app.services.storage import upload_bol, upload_load_document, get_presigned_url
 from app.services.factoring import push_invoice_to_factor, send_packet_to_factor
 from app.services.tokenomics import credit_driver_savings
 from app.services.buyback_notifications import BuybackNotificationService
@@ -2114,24 +2114,37 @@ async def driver_upload_document(
             raise HTTPException(status_code=404, detail="Load not found or not yours")
 
     final_rate = float(neg.final_rate or 0)
-    # 1. Successful upload to Spaces (images auto-converted to PDF)
+    # 1. Upload to Spaces (private); store bucket + key only
     try:
-        file_url = await upload_load_document(file, trucker_id, load_id, doc_type)
+        bucket, file_key = await upload_load_document(file, trucker_id, load_id, doc_type)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # 2. Update document table
+    # 2. Save bucket + key in DB (not public URL); backend generates URLs when needed
     try:
         with engine.begin() as conn:
             conn.execute(
                 text("""
+                    INSERT INTO webwise.load_documents (load_id, trucker_id, doc_type, file_url, bucket, file_key, processed)
+                    VALUES (:load_id, :tid, :doc_type, NULL, :bucket, :file_key, false)
+                """),
+                {"load_id": load_id, "tid": trucker_id, "doc_type": doc_type, "bucket": bucket, "file_key": file_key},
+            )
+    except ProgrammingError:
+        with engine.begin() as conn2:
+            conn2.execute(
+                text("""
                     INSERT INTO webwise.load_documents (load_id, trucker_id, doc_type, file_url, processed)
                     VALUES (:load_id, :tid, :doc_type, :url, false)
                 """),
-                {"load_id": load_id, "tid": trucker_id, "doc_type": doc_type, "url": file_url},
+                {"load_id": load_id, "tid": trucker_id, "doc_type": doc_type, "url": f"{bucket}/{file_key}"},
             )
-    except ProgrammingError:
-        pass
+
+    # Presigned URL for "View" link in success message only
+    try:
+        download_url = get_presigned_url(bucket, file_key)
+    except Exception:
+        download_url = None
 
     # 3. TRIGGER THE REFILL (moment file hits Spaces)
     # dispatch_fee = final_rate * 0.02; candle_kickback = dispatch_fee * 0.21 → add to driver ledger
@@ -2160,7 +2173,7 @@ async def driver_upload_document(
 
     resp = templates.TemplateResponse(
         "drivers/partials/upload_document_success.html",
-        {"request": request, "file_url": file_url, "load_id": load_id, "doc_type": doc_type},
+        {"request": request, "file_url": download_url, "load_id": load_id, "doc_type": doc_type},
     )
     resp.headers["HX-Trigger"] = "bolUploaded, dashboardActiveLoadsRefresh"
     return resp
@@ -2777,11 +2790,12 @@ async def upload_proof_of_delivery(
     # load = db.query(LoadModel).filter(LoadModel.load_board_id == load_id).first()
     # if not load: raise HTTPException(404, "Load not found")
 
-    # 2. Upload to DigitalOcean
+    # 2. Upload to Spaces (private); store bucket + key only; generate URL only when sending to factor
     try:
-        bol_url = await upload_bol(file, mc_number, load_id)
-        if not bol_url:
-            raise HTTPException(status_code=500, detail="Failed to upload BOL: upload_bol returned None. Check server logs.")
+        bucket, file_key = await upload_bol(file, mc_number, load_id)
+        if not bucket or not file_key:
+            raise HTTPException(status_code=500, detail="Failed to upload BOL: upload_bol returned empty. Check server logs.")
+        bol_url = get_presigned_url(bucket, file_key)
     except Exception as e:
         import traceback
         error_detail = f"Upload failed: {str(e)}"

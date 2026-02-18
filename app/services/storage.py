@@ -1,17 +1,21 @@
 import io
 import os
 from datetime import datetime
+from typing import Optional, Tuple
 
 import boto3
 from fastapi import UploadFile
 
 from app.core.config import settings
 
+# Presigned URL expiry (seconds) when sending to factor or showing in UI
+PRESIGNED_EXPIRES = 3600
+
 # Load from .env
 DO_SPACES_KEY = os.getenv("DO_SPACES_KEY")
 DO_SPACES_SECRET = os.getenv("DO_SPACES_SECRET")
 DO_SPACES_REGION = os.getenv("DO_SPACES_REGION", "nyc3")
-DO_SPACES_BUCKET = os.getenv("DO_SPACES_BUCKET", "our-cloud-storage")
+DO_SPACES_BUCKET = os.getenv("DO_SPACES_BUCKET", "greencandle")
 DO_SPACES_ENDPOINT = os.getenv("DO_SPACES_ENDPOINT") or f"https://{DO_SPACES_REGION}.digitaloceanspaces.com"
 
 
@@ -39,44 +43,34 @@ def list_buckets():
         return []
 
 
-async def upload_bol(file: UploadFile, mc_number: str, load_id: str) -> str:
-    """Uploads BOL to Spaces and returns the public URL. Uses STORAGE_BUCKET_PREFIX (dispatch/) inside bucket."""
-    
-    # --- FAIL-SAFE FOR TESTING ---
-    # If no keys are found, return a fake URL so we can test the MATH.
+async def upload_bol(file: UploadFile, mc_number: str, load_id: str) -> Tuple[str, str]:
+    """
+    Uploads BOL to Spaces (private). Returns (bucket, key) only.
+    Store these in DB; generate URLs dynamically via get_document_url() or get_object().
+    """
+    prefix = settings.STORAGE_BUCKET_PREFIX.rstrip("/")
+    file_extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    file_path = f"{prefix}/raw/bol/{mc_number}_{load_id}_BOL_signed.{file_extension}"
+
     if not DO_SPACES_KEY or not DO_SPACES_SECRET:
-        print("⚠️  WARNING: No DigitalOcean Keys found. Returning MOCK URL.")
-        prefix = settings.STORAGE_BUCKET_PREFIX
-        return f"http://localhost:8990/mock-storage/{prefix}/{mc_number}/{load_id}/{file.filename}"
-    # -----------------------------
+        print("⚠️  WARNING: No DigitalOcean Keys found. Returning MOCK bucket/key.")
+        return (DO_SPACES_BUCKET or "greencandle", file_path)
 
     s3 = get_s3_client()
-    file_extension = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    # Path format: dispatch/MC123456/LOAD_999/BOL_signed.jpg (prefix from config)
-    prefix = settings.STORAGE_BUCKET_PREFIX.rstrip("/")
-    file_path = f"{prefix}/{mc_number}/{load_id}/BOL_signed.{file_extension}"
-    
     try:
-        # Reset file pointer to start (FastAPI UploadFile may have been read already)
         await file.seek(0)
-        # Read file content into memory for boto3
         file_content = await file.read()
-        
         if not file_content:
             raise ValueError("File content is empty")
-        
-        print(f"📤 Uploading to bucket '{DO_SPACES_BUCKET}' in region '{DO_SPACES_REGION}' at path '{file_path}'")
-        
-        # Upload using put_object (works better with bytes than upload_fileobj for FastAPI UploadFile)
+        print(f"📤 Uploading to bucket '{DO_SPACES_BUCKET}' key '{file_path}' (private)")
         s3.put_object(
             Bucket=DO_SPACES_BUCKET,
             Key=file_path,
             Body=file_content,
-            ACL="public-read",
-            ContentType=file.content_type or "image/jpeg"
+            ContentType=file.content_type or "image/jpeg",
+            # No ACL = private; backend generates URLs when needed
         )
-        # Public URL: https://nyc3.digitaloceanspaces.com/our-cloud-storage/dispatch/MC123/LOAD_999/BOL_signed.jpg
-        return f"{DO_SPACES_ENDPOINT}/{DO_SPACES_BUCKET}/{file_path}"
+        return (DO_SPACES_BUCKET, file_path)
     except Exception as e:
         error_type = type(e).__name__
         error_msg = str(e)
@@ -98,6 +92,26 @@ async def upload_bol(file: UploadFile, mc_number: str, load_id: str) -> str:
         raise ValueError(error_msg) from e
 
 
+def get_object(bucket: str, key: str) -> bytes:
+    """
+    Retrieve file from Spaces (private). Use for OCR, factoring packet, or streaming.
+    Raises if bucket/key missing or access fails.
+    """
+    s3 = get_s3_client()
+    resp = s3.get_object(Bucket=bucket, Key=key)
+    return resp["Body"].read()
+
+
+def get_presigned_url(bucket: str, key: str, expires_in: int = PRESIGNED_EXPIRES) -> str:
+    """Generate a temporary URL for download/view. Backend never stores public URLs."""
+    s3 = get_s3_client()
+    return s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": bucket, "Key": key},
+        ExpiresIn=expires_in,
+    )
+
+
 def _image_to_pdf(content: bytes, content_type: str) -> bytes:
     """Convert JPG/PNG image bytes to single-page PDF. Returns PDF bytes."""
     import img2pdf
@@ -110,11 +124,11 @@ async def upload_load_document(
     trucker_id: int,
     load_id: str,
     doc_type: str = "BOL",
-) -> str:
+) -> Tuple[str, str]:
     """
-    Upload load document (BOL, RateCon, Lumper). Converts images to PDF for professionalism.
-    Path: {prefix}/trucker_{id}/load_{id}/{doc_type}_{timestamp}.pdf
-    Returns public file_url.
+    Upload load document (BOL, RateCon, Lumper) to Spaces (private).
+    Converts images to PDF. Returns (bucket, key) only — store these in DB;
+    generate URLs via get_presigned_url() or get_object() when needed.
     """
     prefix = settings.STORAGE_BUCKET_PREFIX.rstrip("/")
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -138,15 +152,15 @@ async def upload_load_document(
     file_path = f"{prefix}/trucker_{trucker_id}/load_{load_id}/{doc_type}_{timestamp}.{target_ext}"
 
     if not DO_SPACES_KEY or not DO_SPACES_SECRET:
-        print("⚠️  WARNING: No DigitalOcean Keys. Returning MOCK URL.")
-        return f"http://localhost:8990/mock-storage/{file_path}"
+        print("⚠️  WARNING: No DigitalOcean Keys. Returning MOCK bucket/key.")
+        return (DO_SPACES_BUCKET or "greencandle", file_path)
 
     s3 = get_s3_client()
     s3.put_object(
         Bucket=DO_SPACES_BUCKET,
         Key=file_path,
         Body=content,
-        ACL="public-read",
         ContentType=target_content_type,
+        # No ACL = private; backend generates URLs when needed
     )
-    return f"{DO_SPACES_ENDPOINT}/{DO_SPACES_BUCKET}/{file_path}"
+    return (DO_SPACES_BUCKET, file_path)

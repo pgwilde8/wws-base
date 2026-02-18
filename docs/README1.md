@@ -30,7 +30,7 @@ Nginx config: /etc/nginx/sites-available/greencandledispatch.com (proxies to 127
 # git remote set-url origin https://YOUR_TOKEN@github.com/pgwilde8/dispatch.git
 
 git add -A
-git commit -m "frontend2"
+git commit -m "century-flow"
 git push -u origin main
 
 http://134.199.241.56:8990/admin/login
@@ -63,7 +63,7 @@ FROM webwise.brokers;
 
 python3 scripts/add_broker_contact.py --mc 315784 --email imills@onlinefreight.com    
 
-connect: psql "postgresql://wws-admin:WwsAdmin2026%21@localhost/wws_dispatch_db"
+**********connect: psql "postgresql://wws-admin:WwsAdmin2026%21@localhost/wws_dispatch_db"
 python3 final_check.py
 python3 inbound_listener.py
 
